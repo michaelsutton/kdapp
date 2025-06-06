@@ -1,0 +1,14 @@
+target
+web-root
+**/.idea/
+/rust-toolchain
+/.vscode/
+**/db-*
+analyzer-target
+.DS_Store
+*.code-workspace
+/setup
+testing/integration/perflogs*
+Servers.toml
+release
+package-sizes.js

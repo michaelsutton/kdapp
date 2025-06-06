@@ -1,0 +1,87 @@
+[workspace]
+resolver = "2"
+members = ["kdapp", "examples/tictactoe"]
+
+
+[workspace.package]
+version = "0.0.1"
+rust-version = "1.83.0"
+authors = ["Kaspa developers"]
+license = "ISC"
+license-file = "LICENSE"
+edition = "2021" # Rust edition
+include = [
+    "src/**/*.rs",
+    "src/**/*.s",
+    "src/**/*.r",
+    "proto/**/*.proto",
+    "benches/**/*.rs",
+    "build.rs",
+    "Cargo.toml",
+    "Cargo.lock",
+]
+
+
+[workspace.dependencies]
+kdapp = { version = "0.0.1", path = "kdapp" }
+
+kaspa-core = { git = "https://github.com/kaspanet/rusty-kaspa.git", tag = "v1.0.0" }
+kaspa-wrpc-client = { git = "https://github.com/kaspanet/rusty-kaspa.git", tag = "v1.0.0" }
+kaspa-rpc-core = { git = "https://github.com/kaspanet/rusty-kaspa.git", tag = "v1.0.0" }
+kaspa-p2p-lib = { git = "https://github.com/kaspanet/rusty-kaspa.git", tag = "v1.0.0" }
+kaspa-consensus-core = { git = "https://github.com/kaspanet/rusty-kaspa.git", tag = "v1.0.0" }
+kaspa-hashes = { git = "https://github.com/kaspanet/rusty-kaspa.git", tag = "v1.0.0" }
+kaspa-addresses = { git = "https://github.com/kaspanet/rusty-kaspa.git", tag = "v1.0.0" }
+kaspa-txscript = { git = "https://github.com/kaspanet/rusty-kaspa.git", tag = "v1.0.0" }
+
+borsh = { version = "1.5.1", features = ["derive", "rc"] }
+secp256k1 = { version = "0.29.0", features = [
+    "global-context",
+    "rand-std",
+    "serde",
+] }
+sha2 = "0.10.8"
+thiserror = "1.0.50"
+tokio = { version = "1.43.0", features = ["default", "signal"] }
+faster-hex = "0.9.0"
+# tokio-cron-scheduler = "0.14.0"
+# tonic = { version = "0.12.3", features = ["tls", "gzip"] }
+# futures-util = { version = "0.3.31", default-features = false }
+# sqlx = { version = "0.8.3", features = ["runtime-tokio", "runtime-tokio-native-tls", "postgres"] }
+# deadpool = { version = "0.12.2", features = ["managed", "rt_tokio_1"] }
+# crossbeam-queue = "0.3.12"
+# moka = { version = "0.12.10", features = ["sync"] }
+itertools = "0.14.0"
+# chrono = { version = "0.4.39", features = ["std", "serde"] }
+# bigdecimal = "0.4.7"
+# hex = "0.4.3"
+# regex = "1.11.1"
+# workflow-core = "0.18.0"
+env_logger = "0.11.6"
+log = "0.4.25"
+# vergen-git2 = "1.0.5"
+clap = { version = "4.5.40", features = ["derive", "string", "cargo"] }
+# axum = { version = "0.8.1", features = ["http1", "ws", "json", "tokio"]}
+# tower-http = { version = "0.6.2", features = ["cors"] }
+# utoipa = { version = "5.3.1", features = ["axum_extras", "preserve_order", "chrono"] }
+# utoipa-swagger-ui = { version = "9.0.0", features = ["axum"] }
+# utoipa-axum = "0.2.0"
+# serde = { version = "1.0.217", features = ["derive"] }
+# serde_with = { version = "3.12.0", features = ["hex", "macros"] }
+# serde_json = "1.0.138"
+# sysinfo = "0.34.1"
+# bytesize = "2.0.1"
+# humantime = "2.2.0"
+# humantime-serde = "1.1.1"
+# url = "2.5.4"
+rand = "0.8.5"
+
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+lto = "thin"
+strip = true
+overflow-checks = true
+panic = "abort"

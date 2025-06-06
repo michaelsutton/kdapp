@@ -1,0 +1,31 @@
+[package]
+name = "ttt"
+description = "TicTacToe Example"
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+
+[dependencies]
+kaspa-addresses.workspace = true
+kaspa-core.workspace = true
+kaspa-consensus-core.workspace = true
+kaspa-wrpc-client.workspace = true
+kaspa-rpc-core.workspace = true
+kaspa-txscript.workspace = true
+
+kdapp.workspace = true
+
+borsh.workspace = true
+faster-hex.workspace = true
+itertools.workspace = true
+log.workspace = true
+env_logger.workspace = true
+thiserror.workspace = true
+rand.workspace = true
+secp256k1 = { workspace = true, features = ["global-context", "rand-std"] }
+sha2.workspace = true
+tokio = { workspace = true, features = ["rt", "macros", "rt-multi-thread"] }
+clap.workspace = true
