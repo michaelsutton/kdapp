@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["kdapp", "examples/tictactoe"]
+members = ["kdapp", "examples/tictactoe", "examples/kaspa-auth"]
 
 
 [workspace.package]

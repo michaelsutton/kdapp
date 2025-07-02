@@ -1491,6 +1491,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "kaspa-auth"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "clap",
+ "env_logger",
+ "kaspa-consensus-core",
+ "kaspa-hashes",
+ "kdapp",
+ "log",
+ "rand 0.8.5",
+ "secp256k1",
+ "sha2",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
 name = "kaspa-consensus-client"
 version = "1.0.0"
 source = "git+https://github.com/kaspanet/rusty-kaspa.git?tag=v1.0.0#eb71df4d284593fccd1342094c37edc8c000da85"

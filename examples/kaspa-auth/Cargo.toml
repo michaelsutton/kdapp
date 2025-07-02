@@ -1,0 +1,20 @@
+[package]
+name = "kaspa-auth"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+kdapp = { path = "../../kdapp" }
+borsh = { workspace = true }
+secp256k1 = { workspace = true }
+rand = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+clap = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+sha2 = { workspace = true }
+
+# Kaspa crypto dependencies
+kaspa-consensus-core = { workspace = true }
+kaspa-hashes = { workspace = true }
