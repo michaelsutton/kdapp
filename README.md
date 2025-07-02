@@ -9,7 +9,7 @@ A framework for building high-frequency, interactive decentralized applications 
 
 ## Overview
 
-Kdapp provides the infrastructure to build semi-native, interactive, and time-sensitive decentralized applications (k-dApps) on Kaspa. We call these interactive sessions **"Episodes."**
+Kdapp provides the infrastructure to build semi-native, interactive, and time-sensitive decentralized applications (k-dApps) on Kaspa. These interactive sessions are called **"Episodes."**
 
 The project's philosophy is to provide the fastest possible route for developers to build and deploy creative applications that leverage Kaspa's unique 10 blocks-per-second capability. It prioritizes speed of development and on-chain performance, accepting initial trade-offs in areas like state persistence and interoperability.
 
@@ -83,11 +83,9 @@ Once the game starts, both players' terminals become interactive. When prompted,
 
 -----
 
-## Roadmap & How to Contribute
+## Future Directions & Starting Points
 
-We are actively seeking contributors to help shape the future of this framework. The project is young, and contributions of all kinds—from documentation to core feature development—are valuable.
-
-Please review the open tasks below. If you are interested in working on one, we recommend opening a GitHub Issue to discuss your approach first.
+This is a community-driven framework. The best way to contribute is to fork the repository and take the project in new and unexpected directions (either tailored for specific apps or in general form). Use the list below for inspiration, or bring your own unique ideas to the framework.
 
 -----
 
@@ -101,21 +99,21 @@ Please review the open tasks below. If you are interested in working on one, we 
 #### **Core Engine & Infrastructure**
 
   * `[ ]` **Optimize RPC Syncing for High Throughput:** Improve the RPC syncing process to handle heavy DAG load. This is a significant task that might involve replacing the current polling mechanism with VSPC notifications, using the `get_blocks`/`block notifications` RPC API to prefetch block data, or contributing an RPC extension to Rusty-Kaspa for more efficient transaction fetching.
-  * `[ ]` **Design a Decoupled Client-Server Architecture:** To enable browser-based k-dApps and seamless "vibe coding," a robust client-server model is needed. Unlike the TTT example where each player is also a listener, this task involves designing patterns where the listener runs as a persistent backend (e.g., a web server). This allows clients (browsers) to interact via APIs, potentially using the Kaspa WASM SDK for client-side transaction generation. This architectural work is a foundational step for creating easy-to-deploy, end-to-end applications.
+  * `[ ]` **Design a Decoupled Client-Server Architecture:** To enable browser-based kdapps and seamless "vibe coding," a robust client-server model is needed. Unlike the TTT example where each player is also a listener, this task involves designing patterns where the listener runs as a persistent backend (e.g., a web server). This allows clients (browsers) to interact via APIs, potentially using the Kaspa WASM SDK for client-side transaction generation. This architectural work is a foundational step for creating easy-to-deploy, end-to-end applications.
 
 #### **State Management & Persistence**
 
-This is a set of related tasks that build on each other to provide increasing levels of durability and history for k-dApps.
+This is a set of related tasks that build on each other to provide increasing levels of durability and history for kdapps.
 
   * `[ ]` **Stage 1: Short-Term Sync (RPC Catch-up):** The first step in persistence. This involves storing the latest sync point and implementing a catch-up process on startup. This allows a listener to recover from short downtimes without losing its place in the DAG (within Kaspa's pruning period).
-  * `[ ]` **Stage 2: Full Reorg Protection (State Persistency):** Building on Stage 1, this task introduces a persistent database (e.g., RocksDB) to store rollback objects for arbitrary depths. This ensures that even very deep chain reorgs can be handled correctly. However, this stage does not solve for full history, as a new k-dApp node would still be unable to sync a completed episode from scratch.
-  * `[ ]` **Stage 3: Full History Sync (Archival Support):** The final stage, providing maximum flexibility. This involves designing a mechanism for dedicated archival nodes to store and serve the complete history of episodes. This would allow new k-dApp nodes to join the network at any time and fully sync an episode's history, drawing inspiration from concepts like Kaspa's KIP-15 (ATAN).
+  * `[ ]` **Stage 2: Full Reorg Protection (State Persistency):** Building on Stage 1, this task introduces a persistent database (e.g., RocksDB) to store rollback objects for arbitrary depths. This ensures that even very deep chain reorgs can be handled correctly. However, this stage does not solve for full history, as a new kdapp node would still be unable to sync a completed episode from scratch.
+  * `[ ]` **Stage 3: Full History Sync (Archival Support):** The final stage, providing maximum flexibility. This involves designing a mechanism for dedicated archival nodes to store and serve the complete history of episodes. This would allow new kdapp nodes to join the network at any time and fully sync an episode's history, drawing inspiration from concepts like Kaspa's KIP-15 (ATAN).
 
 #### **Advanced Research & Future Goals**
 
   * `[ ]` **Lay the Groundwork for AI-Assisted Development:** Building on the **decoupled client-server architecture**, the ultimate vision is to enable developers to generate `Episode` trait implementations from natural language prompts. This is a major exploration area with several key components:
       * `[ ]` **Generic Oracle Integration:** Designing a generic framework for feeding external data into an episode. This would involve defining an oracle via a special public key on episode initialization and creating a simple, pluggable system for integrating with various external data sources.
-      * `[ ]` **Dynamic Code Loading:** Designing a server-side engine that can receive generated Rust code, compile it securely, and dynamically load it into a running k-dApp backend.
+      * `[ ]` **Dynamic Code Loading:** Designing a server-side engine that can receive generated Rust code, compile it securely, and dynamically load it into a running kdapp backend.
       * `[ ]` **Multi-Language Support:** Exploring ways to support episodes written in other languages, such as Python. This would likely involve creating a generic Rust wrapper that can host and interact with foreign language runtimes.
       * `[ ]` **Compiler-Driven AI Feedback:** Leveraging the high-level, precise feedback from the Rust compiler (`rustc`) to create an automated loop where AI-generated code is refined and corrected based on compilation errors.
       * `[ ]` **Test Generation:** Developing prompt guides and methodologies for having the AI generate not just the episode logic, but also a corresponding suite of unit and integration tests to ensure correctness.
