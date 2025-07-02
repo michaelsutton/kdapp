@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
+use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Commands for the Kaspa authentication episode
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub enum AuthCommand {
     /// Request a challenge from the server
     RequestChallenge,

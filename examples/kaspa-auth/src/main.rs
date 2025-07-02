@@ -1,14 +1,21 @@
 use clap::{Arg, Command};
 use env_logger;
 use std::error::Error;
+use secp256k1::{Secp256k1, SecretKey, Keypair};
+use log::info;
 
 mod simple_auth_episode;
+mod auth_commands;
+mod episode_runner;
 
 use kdapp::pki::{generate_keypair, sign_message, to_message};
 use kdapp::episode::{PayloadMetadata, Episode};
-use simple_auth_episode::{SimpleAuth, AuthCommand};
+use simple_auth_episode::SimpleAuth;
+use auth_commands::AuthCommand;
+use episode_runner::{AuthServerConfig, run_auth_server};
 
-fn main() -> Result<(), Box<dyn Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
 
     let matches = Command::new("kaspa-auth")
@@ -30,6 +37,42 @@ fn main() -> Result<(), Box<dyn Error>> {
             Command::new("demo")
                 .about("Run interactive demo")
         )
+        .subcommand(
+            Command::new("server")
+                .about("Run auth server on Kaspa testnet-10")
+                .arg(
+                    Arg::new("name")
+                        .short('n')
+                        .long("name")
+                        .value_name("NAME")
+                        .help("Server name")
+                        .default_value("auth-server")
+                )
+                .arg(
+                    Arg::new("key")
+                        .short('k')
+                        .long("key")
+                        .value_name("PRIVATE_KEY")
+                        .help("Private key (hex format) - generates random if not provided")
+                )
+        )
+        .subcommand(
+            Command::new("client")
+                .about("Run auth client on Kaspa testnet-10")
+                .arg(
+                    Arg::new("auth")
+                        .long("auth")
+                        .action(clap::ArgAction::SetTrue)
+                        .help("Initiate authentication flow")
+                )
+                .arg(
+                    Arg::new("key")
+                        .short('k')
+                        .long("key")
+                        .value_name("PRIVATE_KEY")
+                        .help("Private key (hex format) - generates random if not provided")
+                )
+        )
         .get_matches();
 
     match matches.subcommand() {
@@ -45,8 +88,35 @@ fn main() -> Result<(), Box<dyn Error>> {
         Some(("demo", _)) => {
             run_interactive_demo()?;
         }
+        Some(("server", sub_matches)) => {
+            let name = sub_matches.get_one::<String>("name").unwrap().clone();
+            let keypair = if let Some(key_hex) = sub_matches.get_one::<String>("key") {
+                parse_private_key(key_hex)?
+            } else {
+                generate_random_keypair()
+            };
+            
+            info!("🔑 Server public key: {}", hex::encode(keypair.public_key().serialize()));
+            run_kaspa_server(keypair, name).await?;
+        }
+        Some(("client", sub_matches)) => {
+            let should_auth = sub_matches.get_flag("auth");
+            let keypair = if let Some(key_hex) = sub_matches.get_one::<String>("key") {
+                parse_private_key(key_hex)?
+            } else {
+                generate_random_keypair()
+            };
+            
+            info!("🔑 Client public key: {}", hex::encode(keypair.public_key().serialize()));
+            run_kaspa_client(keypair, should_auth).await?;
+        }
         _ => {
             println!("No subcommand specified. Use --help for available commands.");
+            println!("\nAvailable commands:");
+            println!("  test-episode  - Test locally (no Kaspa network)");
+            println!("  demo         - Interactive demo (simulated)");
+            println!("  server       - Run auth server on testnet-10");
+            println!("  client       - Run auth client on testnet-10");
         }
     }
 
@@ -109,7 +179,7 @@ fn test_episode_logic(participant_count: usize) -> Result<(), Box<dyn Error>> {
     println!("📤 Submitting signed response...");
     let rollback2 = auth_episode.execute(
         &AuthCommand::SubmitResponse {
-            signature: signature.0.serialize_der().to_vec(),
+            signature: hex::encode(signature.0.serialize_der()),
             nonce: challenge,
         },
         Some(*pub_key),
@@ -185,7 +255,7 @@ fn run_interactive_demo() -> Result<(), Box<dyn Error>> {
     println!("📤 Alice submits signed response to Bob...");
     let _rollback = auth_episode.execute(
         &AuthCommand::SubmitResponse {
-            signature: signature.0.serialize_der().to_vec(),
+            signature: hex::encode(signature.0.serialize_der()),
             nonce: challenge,
         },
         Some(alice_pk),
@@ -207,6 +277,53 @@ fn run_interactive_demo() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+// Helper functions for Kaspa integration
+
+/// Parse a private key from hex string
+fn parse_private_key(hex_str: &str) -> Result<Keypair, Box<dyn Error>> {
+    let secp = Secp256k1::new();
+    let secret_bytes = hex::decode(hex_str)?;
+    let secret_key = SecretKey::from_slice(&secret_bytes)?;
+    Ok(Keypair::from_secret_key(&secp, &secret_key))
+}
+
+/// Generate a random keypair for development
+fn generate_random_keypair() -> Keypair {
+    let secp = Secp256k1::new();
+    let secret_key = SecretKey::new(&mut rand::thread_rng());
+    Keypair::from_secret_key(&secp, &secret_key)
+}
+
+/// Run Kaspa authentication server
+async fn run_kaspa_server(signer: Keypair, name: String) -> Result<(), Box<dyn Error>> {
+    println!("🎯 Starting Kaspa Auth Server: {}", name);
+    println!("📡 Connecting to testnet-10...");
+    
+    let config = AuthServerConfig::new_testnet10(signer, name);
+    run_auth_server(config).await?;
+    
+    Ok(())
+}
+
+/// Run Kaspa authentication client
+async fn run_kaspa_client(signer: Keypair, should_auth: bool) -> Result<(), Box<dyn Error>> {
+    println!("🔑 Starting Kaspa Auth Client");
+    println!("📡 Connecting to testnet-10...");
+    
+    if should_auth {
+        println!("🚀 Initiating authentication flow...");
+        // TODO: Implement client authentication flow
+        todo!("Client authentication flow not yet implemented");
+    } else {
+        println!("👂 Listening for authentication requests...");
+        // For now, just run a server instance
+        let config = AuthServerConfig::new_testnet10(signer, "auth-client".to_string());
+        run_auth_server(config).await?;
+    }
+    
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -214,6 +331,21 @@ mod tests {
     #[test]
     fn test_episode_creation() {
         let result = test_episode_logic(2);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_random_keypair_generation() {
+        let keypair = generate_random_keypair();
+        // Just verify that we can create a keypair
+        assert!(!keypair.public_key().serialize().is_empty());
+    }
+
+    #[test]
+    fn test_private_key_parsing() {
+        // Test with a valid hex private key
+        let test_key = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+        let result = parse_private_key(test_key);
         assert!(result.is_ok());
     }
 }

@@ -7,6 +7,8 @@ use log::info;
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
 
+use crate::auth_commands::AuthCommand;
+
 #[derive(Debug, BorshDeserialize, BorshSerialize)]
 pub enum AuthError {
     ChallengeNotFound,
@@ -30,11 +32,7 @@ impl std::fmt::Display for AuthError {
 
 impl std::error::Error for AuthError {}
 
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
-pub enum AuthCommand {
-    RequestChallenge,
-    SubmitResponse { signature: Vec<u8>, nonce: String },
-}
+// AuthCommand moved to auth_commands.rs to avoid duplication
 
 #[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
 pub enum AuthRollback {
@@ -77,13 +75,19 @@ impl SimpleAuth {
         format!("sess_{}", rng.gen::<u64>())
     }
 
-    fn verify_signature(&self, pubkey: &PubKey, message: &str, signature: &[u8]) -> bool {
+    fn verify_signature(&self, pubkey: &PubKey, message: &str, signature: &str) -> bool {
         // Use kdapp's built-in verification
         use kdapp::pki::{verify_signature, to_message, Sig};
         use secp256k1::ecdsa::Signature;
         
-        // Convert signature bytes back to Signature
-        let sig = match Signature::from_der(signature) {
+        // Decode hex signature string to bytes
+        let signature_bytes = match hex::decode(signature) {
+            Ok(bytes) => bytes,
+            Err(_) => return false,
+        };
+        
+        // Convert signature bytes to Signature
+        let sig = match Signature::from_der(&signature_bytes) {
             Ok(s) => Sig(s),
             Err(_) => return false,
         };
@@ -284,7 +288,7 @@ mod tests {
         // Submit response
         let _rollback = auth.execute(
             &AuthCommand::SubmitResponse { 
-                signature: sig.0.serialize_der().to_vec(), 
+                signature: hex::encode(sig.0.serialize_der()), 
                 nonce: challenge 
             }, 
             Some(p1), 
