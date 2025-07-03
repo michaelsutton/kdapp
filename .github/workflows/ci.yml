@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main, day*-dev ]
+  pull_request:
+    branches: [ master, main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Configure cache
+      uses: Swatinem/rust-cache@v2
+
+    - name: Check Rust formatting
+      run: cargo fmt --all --check
+
+    - name: Check with clippy
+      run: cargo clippy --all-targets --all-features -- -D warnings
+
+    - name: Run tests
+      run: cargo test --verbose --workspace
+
+    - name: Build kaspa-auth example
+      run: cargo build --verbose -p kaspa-auth
+
+    - name: Run kaspa-auth demo (local test)
+      run: |
+        cd examples/kaspa-auth
+        timeout 30s cargo run -- test-local || [ $? -eq 124 ]
+
+  build:
+    name: Build Check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [x86_64-unknown-linux-gnu, wasm32-unknown-unknown]
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+
+    - name: Configure cache
+      uses: Swatinem/rust-cache@v2
+      with:
+        key: ${{ matrix.target }}
+
+    - name: Build for target
+      run: cargo build --target ${{ matrix.target }} -p kaspa-auth

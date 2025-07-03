@@ -46,7 +46,7 @@ pub enum AuthRollback {
     },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
 pub struct SimpleAuth {
     /// Owner public key (the one being authenticated)
     pub owner: Option<PubKey>,

@@ -1,0 +1,13 @@
+feat(auth): Implement Day 1 kaspa-auth episode
+
+This commit introduces the initial `kaspa-auth` example, fulfilling the "Day 1" requirements from the project roadmap.
+
+It includes:
+- A `simple_auth_episode` with `RequestChallenge` and `SubmitResponse` commands.
+- A local CLI (`test-episode`) to verify the core authentication logic without network dependencies.
+- An interactive CLI demo (`demo`) to simulate the two-party authentication flow.
+- All code is contained within the `examples/kaspa-auth` directory, following the project's structural guidelines.
+
+This provides a solid, testable foundation for the next phase of Kaspa network integration.
+
+Also includes `GEMINI.md` and `CLAUDE.md` for educational context on the development process.

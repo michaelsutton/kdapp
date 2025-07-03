@@ -1,0 +1,74 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  schedule:
+    # Run security audit every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+
+jobs:
+  security_audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+
+    - name: Run security audit
+      run: cargo audit
+
+    - name: Check for known vulnerabilities
+      run: cargo audit --deny warnings
+
+  dependency_check:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Dependency Review
+      uses: actions/dependency-review-action@v4
+      with:
+        fail-on-severity: moderate
+
+  crypto_validation:
+    name: Crypto Implementation Check
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Check for crypto shortcuts
+      run: |
+        echo "🔍 Checking for dangerous crypto shortcuts..."
+        
+        # Check for hardcoded test values
+        if grep -r "test_challenge" examples/kaspa-auth/src/ --include="*.rs" | grep -v "cfg(test)"; then
+          echo "❌ Found hardcoded test challenges outside test code"
+          exit 1
+        fi
+        
+        # Check for unimplemented crypto functions
+        if grep -r "unimplemented!()" examples/kaspa-auth/src/ --include="*.rs" | grep -E "(sign|verify|challenge|auth)"; then
+          echo "❌ Found unimplemented crypto functions"
+          exit 1
+        fi
+        
+        # Check for always-true auth
+        if grep -r "return true" examples/kaspa-auth/src/ --include="*.rs" | grep -E "(verify|auth|check)"; then
+          echo "❌ Found potentially dangerous always-true returns in auth code"
+          exit 1
+        fi
+        
+        echo "✅ No obvious crypto shortcuts detected"
