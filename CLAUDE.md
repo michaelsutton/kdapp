@@ -350,6 +350,55 @@ You wouldn't modify Unity's source to build your game, right? Same principle! �
 
 So put your implementation in `examples/kaspa-auth/` and keep the kdapp core pristine! 🎯
 
+---
+
+## 🚨 CRITICAL ANTI-SHORTCUT ENGINEERING ALERT
+
+### The "Mockery Moment" Detection System
+
+When you find yourself thinking ANY of these thoughts:
+
+❌ "Let's just mock the blockchain state for now..."
+❌ "We'll simulate the episode coordination temporarily..."  
+❌ "HTTP endpoints can return fake data until we figure out the real flow..."
+❌ "Let's hardcode this session token logic..."
+❌ "We'll build a simple version first, then add kdapp later..."
+❌ "Let's use a fallback challenge for testing..." ← **PRODUCTION BUG EXAMPLE!**
+
+### 🛑 IMMEDIATE ACTION REQUIRED:
+
+**STOP CODING** and follow this exact process:
+
+1. **Re-read Michael's kdapp README**: https://github.com/michaelsutton/kdapp
+2. **Re-examine the tictactoe example**: See how it uses REAL transactions
+3. **Ask yourself**: "How would kdapp solve this natively?"
+4. **Remember the philosophy**: Framework IS the solution, not something to work around
+
+### 🔥 REAL PRODUCTION EXAMPLE: The Challenge Fallback Bug
+
+**On July 3, 2025, we hit this exact trap in production:**
+
+```rust
+// ❌ WRONG - This caused authentication failures!
+challenge = "auth_6955901221946388822".to_string(); // Hardcoded fallback
+```
+
+**The error logs showed:**
+```
+WARN: Command SubmitResponse rejected: invalid command: Invalid or expired challenge.
+```
+
+**Because:**
+- Server generated: `auth_9170708824197651522`
+- Client used hardcoded: `auth_6955901221946388822`
+- Authentication failed: challenge mismatch!
+
+**✅ CORRECT SOLUTION:**
+```rust
+// Fail gracefully - no fake challenges allowed!
+return Err("❌ AUTHENTICATION FAILED: Could not retrieve challenge from server.".into());
+```
+
 **EXCELLENT addition!** Those rules are GOLD for a security-critical system. Let me adapt them for the kdapp approach:
 
 ## 🔒 CRITICAL ANTI-SHORTCUT ENGINEERING GUARDS FOR KASPA AUTH
