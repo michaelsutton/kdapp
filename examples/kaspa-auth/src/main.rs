@@ -511,7 +511,7 @@ async fn run_client_authentication(kaspa_signer: Keypair, auth_signer: Keypair) 
     let max_attempts = 10; // 1 second timeout - HTTP coordination is primary
     
     // Wait for episode state with challenge
-    loop {
+    'outer: loop {
         attempt_count += 1;
         
         if let Ok((received_episode_id, episode_state)) = response_receiver.try_recv() {
@@ -536,33 +536,38 @@ async fn run_client_authentication(kaspa_signer: Keypair, auth_signer: Keypair) 
         if attempt_count >= max_attempts {
             println!("⚠️ Timeout waiting for challenge. Using HTTP fallback...");
             
-            // Try to get challenge via HTTP coordination
+            // Retry HTTP coordination with backoff
             let client = reqwest::Client::new();
             let challenge_url = format!("http://127.0.0.1:8080/challenge/{}", episode_id);
             
-            match client.get(&challenge_url).send().await {
-                Ok(response) if response.status().is_success() => {
-                    if let Ok(challenge_json) = response.text().await {
-                        println!("📡 HTTP response: {}", challenge_json);
-                        // Parse JSON to extract challenge
-                        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&challenge_json) {
-                            if let Some(server_challenge) = parsed["challenge"].as_str() {
-                                challenge = server_challenge.to_string();
-                                println!("🎯 Challenge retrieved via HTTP: {}", challenge);
-                                break;
+            for retry_attempt in 1..=5 {
+                println!("🔄 HTTP retry attempt {} of 5...", retry_attempt);
+                
+                match client.get(&challenge_url).send().await {
+                    Ok(response) if response.status().is_success() => {
+                        if let Ok(challenge_json) = response.text().await {
+                            println!("📡 HTTP response: {}", challenge_json);
+                            // Parse JSON to extract challenge
+                            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&challenge_json) {
+                                if let Some(server_challenge) = parsed["challenge"].as_str() {
+                                    challenge = server_challenge.to_string();
+                                    println!("🎯 Challenge retrieved via HTTP: {}", challenge);
+                                    break 'outer;
+                                }
                             }
                         }
                     }
+                    _ => {
+                        println!("❌ HTTP attempt {} failed", retry_attempt);
+                    }
                 }
-                _ => {
-                    println!("❌ HTTP fallback failed");
-                }
+                
+                // Wait before retry
+                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
             }
             
-            // Last resort: use current server challenge from logs
-            challenge = "auth_6955901221946388822".to_string();
-            println!("🎯 Using current server challenge: {}", challenge);
-            break;
+            // All attempts failed - exit with error
+            return Err("❌ AUTHENTICATION FAILED: Could not retrieve challenge from server after multiple attempts. Please ensure the auth server is running and accessible.".into());
         }
         
         // Add timeout to prevent infinite waiting
