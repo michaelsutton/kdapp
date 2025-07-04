@@ -8,16 +8,19 @@ use kaspa_addresses;
 mod simple_auth_episode;
 mod auth_commands;
 mod episode_runner;
+mod http_server;
 
 use kdapp::pki::{generate_keypair, sign_message, to_message};
 use kdapp::episode::{PayloadMetadata, Episode};
 use simple_auth_episode::SimpleAuth;
 use auth_commands::AuthCommand;
 use episode_runner::{AuthServerConfig, run_auth_server};
+use http_server::start_http_server;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    env_logger::init();
+    // Initialize logger with clean output - hide debug spam from kdapp internals
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("kaspa_auth=info,kdapp::generator=error,kdapp=warn")).init();
 
     let matches = Command::new("kaspa-auth")
         .version("0.1.0")
@@ -32,6 +35,51 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         .value_name("COUNT")
                         .help("Number of participants")
                         .default_value("1")
+                )
+        )
+        .subcommand(
+            Command::new("http-server")
+                .about("Run HTTP coordination server for authentication")
+                .arg(
+                    Arg::new("port")
+                        .short('p')
+                        .long("port")
+                        .value_name("PORT")
+                        .help("HTTP server port")
+                        .default_value("8080")
+                )
+                .arg(
+                    Arg::new("key")
+                        .short('k')
+                        .long("key")
+                        .value_name("PRIVATE_KEY")
+                        .help("Private key (hex format) - generates random if not provided")
+                )
+        )
+        .subcommand(
+            Command::new("authenticate")
+                .about("🚀 One-command authentication with HTTP server (EASY MODE)")
+                .arg(
+                    Arg::new("server")
+                        .short('s')
+                        .long("server")
+                        .value_name("URL")
+                        .help("HTTP server URL")
+                        .default_value("http://127.0.0.1:8080")
+                )
+                .arg(
+                    Arg::new("key")
+                        .short('k')
+                        .long("key")
+                        .value_name("PRIVATE_KEY")
+                        .help("Private key (hex format) - generates random if not provided")
+                )
+                .arg(
+                    Arg::new("keyfile")
+                        .short('f')
+                        .long("keyfile")
+                        .value_name("FILE")
+                        .help("Load private key from file (safer than --key)")
                 )
         )
         .subcommand(
@@ -104,6 +152,42 @@ async fn main() -> Result<(), Box<dyn Error>> {
             
             test_episode_logic(participant_count)?;
         }
+        Some(("http-server", sub_matches)) => {
+            let port: u16 = sub_matches
+                .get_one::<String>("port")
+                .unwrap()
+                .parse()
+                .unwrap_or(8080);
+            
+            let keypair = if let Some(key_hex) = sub_matches.get_one::<String>("key") {
+                parse_private_key(key_hex)?
+            } else {
+                generate_random_keypair()
+            };
+            
+            info!("🔑 HTTP Server public key: {}", hex::encode(keypair.public_key().serialize()));
+            start_http_server(keypair, port).await?;
+        }
+        Some(("authenticate", sub_matches)) => {
+            let server_url = sub_matches.get_one::<String>("server").unwrap().clone();
+            
+            // Get private key from various sources
+            let keypair = if let Some(keyfile_path) = sub_matches.get_one::<String>("keyfile") {
+                load_private_key_from_file(keyfile_path)?
+            } else if let Some(key_hex) = sub_matches.get_one::<String>("key") {
+                parse_private_key(key_hex)?
+            } else {
+                // Generate a random key for this session (safer than hardcoded)
+                println!("🔑 No key provided - generating random keypair for this session");
+                println!("📝 For production, use: --key YOUR_PRIVATE_KEY or --keyfile YOUR_KEYFILE");
+                println!("⚠️  This random key will only work if server uses the same key!");
+                println!();
+                generate_random_keypair()
+            };
+            
+            println!("🚀 Starting automatic authentication with server: {}", server_url);
+            run_automatic_authentication(server_url, keypair).await?;
+        }
         Some(("demo", _)) => {
             run_interactive_demo()?;
         }
@@ -158,7 +242,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         _ => {
             println!("No subcommand specified. Use --help for available commands.");
             println!("\nAvailable commands:");
+            println!("  authenticate  - 🚀 Easy one-command authentication (RECOMMENDED)");
             println!("  test-episode  - Test locally (no Kaspa network)");
+            println!("  http-server   - Run HTTP coordination server");
             println!("  demo         - Interactive demo (simulated)");
             println!("  server       - Run auth server on testnet-10");
             println!("  client       - Run auth client on testnet-10");
@@ -337,6 +423,16 @@ fn generate_random_keypair() -> Keypair {
     let secp = Secp256k1::new();
     let secret_key = SecretKey::new(&mut rand::thread_rng());
     Keypair::from_secret_key(&secp, &secret_key)
+}
+
+/// Load private key from file (secure alternative to command line)
+fn load_private_key_from_file(path: &str) -> Result<Keypair, Box<dyn Error>> {
+    use std::fs;
+    let key_hex = fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read keyfile {}: {}", path, e))?
+        .trim()
+        .to_string();
+    parse_private_key(&key_hex)
 }
 
 /// Run Kaspa authentication server
@@ -604,6 +700,144 @@ async fn run_client_authentication(kaspa_signer: Keypair, auth_signer: Keypair) 
     println!("✅ Authentication commands submitted to Kaspa blockchain!");
     println!("🎯 Real kdapp architecture: Generator → Proxy → Engine → Episode");
     println!("📊 Transactions are now being processed by auth server's kdapp engine");
+    
+    Ok(())
+}
+
+/// 🚀 Automatic authentication - handles entire flow seamlessly
+async fn run_automatic_authentication(server_url: String, keypair: Keypair) -> Result<(), Box<dyn Error>> {
+    use serde_json::Value;
+    
+    let client = reqwest::Client::new();
+    let public_key_hex = hex::encode(keypair.public_key().serialize());
+    
+    println!("🔑 Using public key: {}", public_key_hex);
+    println!();
+    
+    // Step 1: Create episode
+    println!("📝 Step 1: Creating authentication episode...");
+    let start_response = client
+        .post(&format!("{}/auth/start", server_url))
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "public_key": public_key_hex
+        }))
+        .send()
+        .await?;
+    
+    if !start_response.status().is_success() {
+        return Err(format!("Failed to create episode: {}", start_response.status()).into());
+    }
+    
+    let start_data: Value = start_response.json().await?;
+    let episode_id = start_data["episode_id"].as_u64()
+        .ok_or("Invalid episode_id in response")?;
+    
+    println!("✅ Episode created: {}", episode_id);
+    
+    // Step 2: Request challenge
+    println!("🎲 Step 2: Requesting challenge from blockchain...");
+    let challenge_response = client
+        .post(&format!("{}/auth/request-challenge", server_url))
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "episode_id": episode_id,
+            "public_key": public_key_hex
+        }))
+        .send()
+        .await?;
+    
+    if !challenge_response.status().is_success() {
+        return Err(format!("Failed to request challenge: {}", challenge_response.status()).into());
+    }
+    
+    println!("✅ Challenge requested, waiting for blockchain processing...");
+    
+    // Step 3: Wait for challenge to be ready
+    println!("⏳ Step 3: Waiting for challenge generation...");
+    let mut challenge = String::new();
+    for attempt in 1..=10 {
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        
+        let status_response = client
+            .get(&format!("{}/auth/status/{}", server_url, episode_id))
+            .send()
+            .await?;
+        
+        if status_response.status().is_success() {
+            let status_data: Value = status_response.json().await?;
+            if let Some(challenge_value) = status_data["challenge"].as_str() {
+                challenge = challenge_value.to_string();
+                println!("✅ Challenge received: {}", challenge);
+                break;
+            }
+        }
+        
+        if attempt < 10 {
+            print!("⏳ Attempt {}/10, still waiting...\r", attempt);
+            std::io::Write::flush(&mut std::io::stdout()).unwrap();
+        } else {
+            return Err("Timeout waiting for challenge generation".into());
+        }
+    }
+    println!();
+    
+    // Step 4: Sign challenge locally (SECURE - no private key sent!)
+    println!("✍️  Step 4: Signing challenge locally (private key stays secure)...");
+    let message = to_message(&challenge);
+    let signature = sign_message(&keypair.secret_key(), &message);
+    let signature_hex = hex::encode(signature.0.serialize_der());
+    
+    println!("✅ Challenge signed locally");
+    
+    // Step 5: Submit verification
+    println!("📤 Step 5: Submitting authentication response...");
+    let verify_response = client
+        .post(&format!("{}/auth/verify", server_url))
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "episode_id": episode_id,
+            "signature": signature_hex,
+            "nonce": challenge
+        }))
+        .send()
+        .await?;
+    
+    if !verify_response.status().is_success() {
+        return Err(format!("Failed to submit verification: {}", verify_response.status()).into());
+    }
+    
+    println!("✅ Authentication response submitted");
+    
+    // Step 6: Check final status
+    println!("🔍 Step 6: Checking authentication result...");
+    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+    
+    let final_status = client
+        .get(&format!("{}/auth/status/{}", server_url, episode_id))
+        .send()
+        .await?;
+    
+    if final_status.status().is_success() {
+        let final_data: Value = final_status.json().await?;
+        let authenticated = final_data["authenticated"].as_bool().unwrap_or(false);
+        
+        if authenticated {
+            let session_token = final_data["session_token"].as_str().unwrap_or("none");
+            println!();
+            println!("🎉 SUCCESS! Authentication completed!");
+            println!("✅ Authenticated: true");
+            println!("🎟️  Session token: {}", session_token);
+            println!("📊 Episode ID: {}", episode_id);
+            println!();
+            println!("🚀 You are now authenticated with the Kaspa blockchain!");
+        } else {
+            println!("❌ Authentication failed - please check server logs");
+            return Err("Authentication verification failed".into());
+        }
+    } else {
+        return Err("Failed to check final authentication status".into());
+    }
     
     Ok(())
 }
