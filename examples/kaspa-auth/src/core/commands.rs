@@ -21,6 +21,14 @@ impl AuthCommand {
             AuthCommand::SubmitResponse { .. } => "SubmitResponse",
         }
     }
+    
+    /// Check if command requires authentication
+    pub fn requires_auth(&self) -> bool {
+        match self {
+            AuthCommand::RequestChallenge => false,
+            AuthCommand::SubmitResponse { .. } => true,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -31,6 +39,7 @@ mod tests {
     fn test_request_challenge_command() {
         let cmd = AuthCommand::RequestChallenge;
         assert_eq!(cmd.command_type(), "RequestChallenge");
+        assert!(!cmd.requires_auth());
     }
 
     #[test]
@@ -40,6 +49,7 @@ mod tests {
             nonce: "test_nonce".to_string(),
         };
         assert_eq!(cmd.command_type(), "SubmitResponse");
+        assert!(cmd.requires_auth());
     }
 
     #[test]

@@ -4,49 +4,14 @@ use kdapp::{
     pki::PubKey,
 };
 use log::info;
-use rand::{thread_rng, Rng};
 use std::collections::HashMap;
 
-use crate::auth_commands::AuthCommand;
+use crate::core::{AuthCommand, AuthError, AuthRollback};
+use crate::crypto::challenges::ChallengeGenerator;
+use crate::crypto::signatures::SignatureVerifier;
 
-#[derive(Debug, BorshDeserialize, BorshSerialize)]
-pub enum AuthError {
-    ChallengeNotFound,
-    InvalidChallenge,
-    SignatureVerificationFailed,
-    AlreadyAuthenticated,
-    NotAuthorized,
-}
-
-impl std::fmt::Display for AuthError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AuthError::ChallengeNotFound => write!(f, "Challenge not found for this participant."),
-            AuthError::InvalidChallenge => write!(f, "Invalid or expired challenge."),
-            AuthError::SignatureVerificationFailed => write!(f, "Signature verification failed."),
-            AuthError::AlreadyAuthenticated => write!(f, "Participant is already authenticated."),
-            AuthError::NotAuthorized => write!(f, "Participant is not authorized."),
-        }
-    }
-}
-
-impl std::error::Error for AuthError {}
-
-// AuthCommand moved to auth_commands.rs to avoid duplication
-
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
-pub enum AuthRollback {
-    Challenge { 
-        previous_challenge: Option<String>,
-        previous_timestamp: u64,
-    },
-    Authentication {
-        previous_auth_status: bool,
-        previous_session_token: Option<String>,
-    },
-}
-
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
+/// Simple authentication episode for Kaspa
+#[derive(Clone, Debug, BorshSerialize, BorshDeserialize, PartialEq)]
 pub struct SimpleAuth {
     /// Owner public key (the one being authenticated)
     pub owner: Option<PubKey>,
@@ -64,51 +29,8 @@ pub struct SimpleAuth {
     pub authorized_participants: Vec<PubKey>,
 }
 
-impl SimpleAuth {
-    fn generate_challenge() -> String {
-        let mut rng = thread_rng();
-        format!("auth_{}", rng.gen::<u64>())
-    }
 
-    fn generate_session_token() -> String {
-        let mut rng = thread_rng();
-        format!("sess_{}", rng.gen::<u64>())
-    }
 
-    fn verify_signature(&self, pubkey: &PubKey, message: &str, signature: &str) -> bool {
-        // Use kdapp's built-in verification
-        use kdapp::pki::{verify_signature, to_message, Sig};
-        use secp256k1::ecdsa::Signature;
-        
-        // Decode hex signature string to bytes
-        let signature_bytes = match hex::decode(signature) {
-            Ok(bytes) => bytes,
-            Err(_) => return false,
-        };
-        
-        // Convert signature bytes to Signature
-        let sig = match Signature::from_der(&signature_bytes) {
-            Ok(s) => Sig(s),
-            Err(_) => return false,
-        };
-        
-        // Create message for verification (kdapp expects a serializable object)
-        let msg = to_message(&message.to_string());
-        
-        // Verify using kdapp's verification
-        verify_signature(pubkey, &msg, &sig)
-    }
-
-    fn is_rate_limited(&self, pubkey: &PubKey) -> bool {
-        let pubkey_str = format!("{}", pubkey);
-        self.rate_limits.get(&pubkey_str).map_or(false, |&attempts| attempts >= 5)
-    }
-
-    fn increment_rate_limit(&mut self, pubkey: &PubKey) {
-        let pubkey_str = format!("{}", pubkey);
-        *self.rate_limits.entry(pubkey_str).or_insert(0) += 1;
-    }
-}
 
 impl Episode for SimpleAuth {
     type Command = AuthCommand;
@@ -145,7 +67,7 @@ impl Episode for SimpleAuth {
 
         // Rate limiting check
         if self.is_rate_limited(&participant) {
-            return Err(EpisodeError::InvalidCommand(AuthError::NotAuthorized));
+            return Err(EpisodeError::InvalidCommand(AuthError::RateLimited));
         }
 
         match cmd {
@@ -157,7 +79,7 @@ impl Episode for SimpleAuth {
                 let previous_timestamp = self.challenge_timestamp;
                 
                 // Generate new challenge
-                let new_challenge = Self::generate_challenge();
+                let new_challenge = ChallengeGenerator::generate();
                 self.challenge = Some(new_challenge);
                 self.challenge_timestamp = metadata.accepting_time;
                 self.owner = Some(participant);
@@ -189,7 +111,7 @@ impl Episode for SimpleAuth {
                 }
                 
                 // Verify signature
-                if !self.verify_signature(&participant, current_challenge, signature) {
+                if !SignatureVerifier::verify(&participant, current_challenge, signature) {
                     return Err(EpisodeError::InvalidCommand(AuthError::SignatureVerificationFailed));
                 }
                 
@@ -208,6 +130,7 @@ impl Episode for SimpleAuth {
                     previous_session_token,
                 })
             }
+            
         }
     }
 
@@ -227,6 +150,33 @@ impl Episode for SimpleAuth {
         }
     }
 }
+
+impl SimpleAuth {
+
+    /// Check if a participant is rate limited
+    fn is_rate_limited(&self, pubkey: &PubKey) -> bool {
+        let pubkey_str = format!("{}", pubkey);
+        self.rate_limits.get(&pubkey_str).map_or(false, |&attempts| attempts >= 5)
+    }
+
+    /// Increment rate limit counter for a participant
+    fn increment_rate_limit(&mut self, pubkey: &PubKey) {
+        let pubkey_str = format!("{}", pubkey);
+        *self.rate_limits.entry(pubkey_str).or_insert(0) += 1;
+    }
+
+    /// Generate a new session token
+    fn generate_session_token() -> String {
+        use rand::{thread_rng, Rng};
+        let mut rng = thread_rng();
+        format!("sess_{}", rng.gen::<u64>())
+    }
+
+}
+
+
+
+
 
 #[cfg(test)]
 mod tests {
@@ -297,5 +247,35 @@ mod tests {
         
         assert!(auth.is_authenticated);
         assert!(auth.session_token.is_some());
+    }
+
+    #[test]
+    fn test_rate_limiting() {
+        let ((_s1, p1), (_s2, _p2)) = (generate_keypair(), generate_keypair());
+        let metadata = PayloadMetadata { 
+            accepting_hash: 0u64.into(), 
+            accepting_daa: 0, 
+            accepting_time: 0, 
+            tx_id: 1u64.into() 
+        };
+        
+        let mut auth = SimpleAuth::initialize(vec![p1], &metadata);
+        
+        // Should not be rate limited initially
+        assert!(!auth.is_rate_limited(&p1));
+        
+        // Make 4 requests - should still work
+        for _ in 0..4 {
+            auth.execute(&AuthCommand::RequestChallenge, Some(p1), &metadata).unwrap();
+        }
+        assert!(!auth.is_rate_limited(&p1));
+        
+        // 5th request should trigger rate limit
+        auth.execute(&AuthCommand::RequestChallenge, Some(p1), &metadata).unwrap();
+        assert!(auth.is_rate_limited(&p1));
+        
+        // 6th request should be rejected
+        let result = auth.execute(&AuthCommand::RequestChallenge, Some(p1), &metadata);
+        assert!(result.is_err());
     }
 }
