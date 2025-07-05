@@ -431,7 +431,17 @@ kaspa-auth/
 │   ├── api/http/                 # HTTP server (6 endpoints ✅)
 │   │   ├── server.rs             # Axum server with authentication
 │   │   └── handlers.rs           # Request handling
+│   ├── cli/                      # CLI commands (6 endpoints support ✅)
+│   │   ├── commands/             # Individual CLI commands
+│   │   │   ├── server.rs         # server command (Kaspa integration)
+│   │   │   ├── client.rs         # client command (blockchain auth)
+│   │   │   ├── authenticate.rs   # authenticate command (HTTP flow)
+│   │   │   └── http_server.rs    # http-server command (standalone API)
+│   │   └── mod.rs                # CLI parser and configuration
 │   └── episode_runner.rs         # Kaspa integration (3 tests ✅)
+├── test-cli.sh                   # Testing script ✅
+├── CLAUDE.md                     # Development roadmap ✅
+└── GEMINI.md                     # Anti-mockery guide ✅
 ```
 
 **🔧 FRAMEWORK (Local Development):**
