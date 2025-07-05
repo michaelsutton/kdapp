@@ -1,5 +1,4 @@
 // Core working modules
-pub mod auth_commands;
 pub mod episode_runner;
 pub mod core;
 pub mod crypto;
@@ -18,5 +17,5 @@ pub mod events;
 pub mod examples;
 
 // Public API exports (only working functionality)
-pub use auth_commands::AuthCommand;
+pub use core::commands::AuthCommand;
 pub use episode_runner::{AuthEventHandler, AuthServerConfig, run_auth_server, create_auth_generator};

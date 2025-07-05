@@ -5,17 +5,14 @@ use secp256k1::{Secp256k1, SecretKey, Keypair};
 use log::info;
 use kaspa_addresses;
 
-mod simple_auth_episode;
-mod auth_commands;
-mod episode_runner;
-mod http_server;
-
+use kaspa_auth::core::episode::SimpleAuth;
+use kaspa_auth::core::commands::AuthCommand;
+use kaspa_auth::{AuthServerConfig, run_auth_server};
+use kaspa_auth::api::http::server::run_http_server;
 use kdapp::pki::{generate_keypair, sign_message, to_message};
 use kdapp::episode::{PayloadMetadata, Episode};
-use simple_auth_episode::SimpleAuth;
-use auth_commands::AuthCommand;
-use episode_runner::{AuthServerConfig, run_auth_server};
-use http_server::start_http_server;
+// use crate::cli::Cli; // Using inline clap structure instead
+// use clap::Parser;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -112,6 +109,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 )
         )
         .subcommand(
+            Command::new("tournament")
+                .about("Tournament authentication mode")
+                .arg(
+                    Arg::new("create")
+                        .long("create")
+                        .help("Create a new tournament")
+                )
+                .arg(
+                    Arg::new("max-players")
+                        .long("max-players")
+                        .value_name("COUNT")
+                        .default_value("100")
+                )
+        )
+        .subcommand(
             Command::new("client")
                 .about("Run auth client on Kaspa testnet-10")
                 .arg(
@@ -166,7 +178,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             };
             
             info!("🔑 HTTP Server public key: {}", hex::encode(keypair.public_key().serialize()));
-            start_http_server(keypair, port).await?;
+            run_http_server(keypair, port).await?;
         }
         Some(("authenticate", sub_matches)) => {
             let server_url = sub_matches.get_one::<String>("server").unwrap().clone();
@@ -483,7 +495,7 @@ async fn run_client_authentication(kaspa_signer: Keypair, auth_signer: Keypair) 
     use kaspa_consensus_core::{network::NetworkId, tx::{TransactionOutpoint, UtxoEntry}};
     use kaspa_wrpc_client::prelude::*;
     use kaspa_rpc_core::api::rpc::RpcApi;
-    use episode_runner::{AUTH_PATTERN, AUTH_PREFIX};
+    use kaspa_auth::episode_runner::{AUTH_PATTERN, AUTH_PREFIX};
     use rand::Rng;
     
     let client_pubkey = kdapp::pki::PubKey(auth_signer.public_key());
@@ -557,7 +569,7 @@ async fn run_client_authentication(kaspa_signer: Keypair, auth_signer: Keypair) 
     use std::sync::{mpsc::channel, Arc, atomic::AtomicBool};
     use tokio::sync::mpsc::UnboundedSender;
     use kdapp::{engine::{self}, episode::EpisodeEventHandler};
-    use crate::simple_auth_episode::SimpleAuth;
+    use kaspa_auth::core::episode::SimpleAuth;
     
     let (sender, receiver) = channel();
     let (response_sender, mut response_receiver) = tokio::sync::mpsc::unbounded_channel();
@@ -632,29 +644,72 @@ async fn run_client_authentication(kaspa_signer: Keypair, auth_signer: Keypair) 
         if attempt_count >= max_attempts {
             println!("⚠️ Timeout waiting for challenge. Using HTTP fallback...");
             
-            // Retry HTTP coordination with backoff
+            // Step 1: Register episode with HTTP server
             let client = reqwest::Client::new();
-            let challenge_url = format!("http://127.0.0.1:8080/challenge/{}", episode_id);
+            let public_key_hex = hex::encode(client_pubkey.0.serialize());
             
+            println!("📝 Registering episode {} with HTTP server...", episode_id);
+            
+            // First, try to register the episode with HTTP server using a custom endpoint
+            // Since we generated the episode ID on blockchain, we need to register it
+            let register_url = format!("http://127.0.0.1:8080/auth/register-episode");
+            let register_response = client
+                .post(&register_url)
+                .header("Content-Type", "application/json")
+                .json(&serde_json::json!({
+                    "episode_id": episode_id,
+                    "public_key": public_key_hex
+                }))
+                .send()
+                .await;
+            
+            if register_response.is_ok() {
+                println!("✅ Episode registered with HTTP server");
+            } else {
+                println!("⚠️ Could not register episode, trying legacy endpoint...");
+            }
+            
+            // Step 2: Try to get challenge via HTTP
             for retry_attempt in 1..=5 {
                 println!("🔄 HTTP retry attempt {} of 5...", retry_attempt);
                 
-                match client.get(&challenge_url).send().await {
+                // Try both the new status endpoint and legacy challenge endpoint
+                let status_url = format!("http://127.0.0.1:8080/auth/status/{}", episode_id);
+                let challenge_url = format!("http://127.0.0.1:8080/challenge/{}", episode_id);
+                
+                // First try the status endpoint
+                match client.get(&status_url).send().await {
                     Ok(response) if response.status().is_success() => {
-                        if let Ok(challenge_json) = response.text().await {
-                            println!("📡 HTTP response: {}", challenge_json);
-                            // Parse JSON to extract challenge
-                            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&challenge_json) {
+                        if let Ok(status_json) = response.text().await {
+                            println!("📡 HTTP status response: {}", status_json);
+                            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&status_json) {
                                 if let Some(server_challenge) = parsed["challenge"].as_str() {
                                     challenge = server_challenge.to_string();
-                                    println!("🎯 Challenge retrieved via HTTP: {}", challenge);
+                                    println!("🎯 Challenge retrieved via HTTP status: {}", challenge);
                                     break 'outer;
                                 }
                             }
                         }
                     }
                     _ => {
-                        println!("❌ HTTP attempt {} failed", retry_attempt);
+                        // If status fails, try legacy challenge endpoint
+                        match client.get(&challenge_url).send().await {
+                            Ok(response) if response.status().is_success() => {
+                                if let Ok(challenge_json) = response.text().await {
+                                    println!("📡 HTTP legacy response: {}", challenge_json);
+                                    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&challenge_json) {
+                                        if let Some(server_challenge) = parsed["challenge"].as_str() {
+                                            challenge = server_challenge.to_string();
+                                            println!("🎯 Challenge retrieved via HTTP legacy: {}", challenge);
+                                            break 'outer;
+                                        }
+                                    }
+                                }
+                            }
+                            _ => {
+                                println!("❌ HTTP attempt {} failed", retry_attempt);
+                            }
+                        }
                     }
                 }
                 

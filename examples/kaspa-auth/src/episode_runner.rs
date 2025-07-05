@@ -1,10 +1,4 @@
-use kdapp::{
-    engine::{self},
-    episode::{EpisodeEventHandler, EpisodeId, PayloadMetadata},
-    generator::{PatternType, PrefixType, TransactionGenerator},
-    pki::PubKey,
-    proxy::{self, connect_client},
-};
+use kdapp::{engine, episode::{EpisodeEventHandler, EpisodeId, PayloadMetadata}, generator::{PatternType, PrefixType, TransactionGenerator}, pki::PubKey, proxy::{self, connect_client}};
 use kaspa_consensus_core::network::{NetworkId, NetworkType};
 use std::sync::{mpsc::channel, Arc, atomic::AtomicBool, Mutex};
 use std::collections::HashMap;
@@ -15,7 +9,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use rand::Rng;
 
-use crate::{SimpleAuth, auth_commands::AuthCommand};
+use crate::{core::episode::SimpleAuth, core::commands::AuthCommand};
 
 // Define unique pattern and prefix for auth transactions
 // Pattern: specific byte positions that must match to reduce node overhead
@@ -116,8 +110,8 @@ pub struct AuthResponse {
 
 /// Simple coordination state
 pub struct CoordinationState {
-    pub challenges: Arc<Mutex<HashMap<String, String>>>, // pubkey -> challenge  
-    pub episode_challenges: Arc<Mutex<HashMap<u64, String>>>, // episode_id -> challenge
+    pub challenges: Arc<Mutex<HashMap<String, String>>>,
+    pub episode_challenges: Arc<Mutex<HashMap<u64, String>>>,
 }
 
 impl AuthServerConfig {
