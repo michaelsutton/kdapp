@@ -59,12 +59,12 @@ This example demonstrates a simple authentication episode using the `kdapp` fram
 - [x] **Course Correction** - **kdapp Philosophy**: Episodes are reality, HTTP is coordination
 - [x] **Poker Tournament Foundation** - Server funding address as escrow for multi-player tournaments
 
-**🎉 Day 6 Complete: Hybrid Authentication Architecture**
+**🎉 Day 6 Complete: Client-Driven Blockchain Authentication**
 
-- [x] **Hybrid Transaction Model** - Client signs commands, server funds transactions
+- [x] **Client-Paid Authentication** - Client funds their own authentication transactions
 - [x] **Production Authentication Flow** - Real kdapp architecture with working signatures
 - [x] **Client Command Signing** - Authentic client signatures for all authentication commands
-- [x] **Server Transaction Coordination** - Server funds and submits transactions to blockchain
+- [x] **Server Coordination Only** - Server coordinates but client pays for all transactions
 - [x] **Complete Web Dashboard** - Browser-based authentication at `http://localhost:8080/`
 - [x] **WebSocket Real-Time Updates** - Live authentication events via WebSocket
 - [x] **Clean Codebase** - Security-hardened, no hardcoded keys or addresses
