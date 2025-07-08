@@ -173,6 +173,27 @@ pub async fn run_http_server(provided_private_key: Option<&str>, port: u16) -> R
     println!("🚀 HTTP Authentication Server starting on port {}", port);
     println!("🔗 Starting kdapp blockchain engine...");
     
+    // Show client wallet funding information
+    match get_wallet_for_command("web-client", None) {
+        Ok(wallet) => {
+            let client_addr = Address::new(
+                Prefix::Testnet,
+                Version::PubKey,
+                &wallet.keypair.x_only_public_key().0.serialize()
+            );
+            println!();
+            println!("💰 CLIENT WALLET FUNDING REQUIRED:");
+            println!("📍 Client Address: {}", client_addr);
+            println!("🚰 Get testnet funds: https://faucet.kaspanet.io/");
+            println!("💡 Clients must fund their own authentication transactions");
+            println!("🌐 Network: testnet-10");
+            println!();
+        }
+        Err(e) => {
+            println!("⚠️  Client wallet creation pending (will be created on first use)");
+        }
+    }
+    
     // Start the blockchain listener in the background
     let auth_server_clone = auth_server.clone();
     tokio::spawn(async move {
@@ -182,7 +203,8 @@ pub async fn run_http_server(provided_private_key: Option<&str>, port: u16) -> R
     });
     
     // Start the HTTP server
-    println!("✅ HTTP server is now a REAL kdapp blockchain node!");
+    println!("🔗 kdapp engine started - HTTP server is now a real blockchain node!");
+    println!("🌐 Web dashboard available at: http://localhost:{}/", port);
     serve(listener, app.into_make_service()).await?;
     
     Ok(())

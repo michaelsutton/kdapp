@@ -59,19 +59,20 @@ This example demonstrates a simple authentication episode using the `kdapp` fram
 - [x] **Course Correction** - **kdapp Philosophy**: Episodes are reality, HTTP is coordination
 - [x] **Poker Tournament Foundation** - Server funding address as escrow for multi-player tournaments
 
-**🎉 Day 7 Complete: Hybrid Authentication Architecture**
+**🎉 Day 6 Complete: Demo Mode Authentication (Server-Funded)**
 
-- [x] **Hybrid Transaction Model** - Client signs commands, server funds transactions
-- [x] **Production Authentication Flow** - Real kdapp architecture with working signatures
+- [x] **Demo Authentication Model** - Server funds transactions for easy onboarding
+- [x] **Tournament-Ready Flow** - Perfect for buy-ins registration and development
 - [x] **Client Command Signing** - Authentic client signatures for all authentication commands
-- [x] **Server Transaction Coordination** - Server funds and submits transactions to blockchain
+- [x] **Server Transaction Funding** - Server covers blockchain costs for demo purposes
 - [x] **Complete Web Dashboard** - Browser-based authentication at `http://localhost:8080/`
 - [x] **WebSocket Real-Time Updates** - Live authentication events via WebSocket
 - [x] **Clean Codebase** - Security-hardened, no hardcoded keys or addresses
 - [x] **Production-Ready Architecture** - Real kdapp engine with HTTP coordination
 
-**🎯 Day 8 Roadmap: Advanced Authentication Features**
+**🎯 Day 7 Roadmap: Production Mode (Client-Funded)**
 
+- [ ] **Production Authentication Mode** - Client pays for their own authentication transactions
 - [ ] **Client-Funded Transactions** - Implement client UTXO management for full decentralization
 - [ ] **Session Token Expiry** - Add automatic session expiration and renewal
 - [ ] **Rate Limiting System** - Implement per-client authentication rate limits
