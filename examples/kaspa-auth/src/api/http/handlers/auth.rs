@@ -79,8 +79,8 @@ pub async fn start_auth(
         };
         
         if entries.is_empty() {
-            println!("❌ No UTXOs found! Server wallet needs funding.");
-            println!("💰 Fund this address: {}", server_addr);
+            println!("❌ No UTXOs found! Client wallet needs funding.");
+            println!("💰 Fund this address: {}", client_addr);
             println!("🚰 Get testnet funds: https://faucet.kaspanet.io/");
             return Err(StatusCode::SERVICE_UNAVAILABLE);
         }
@@ -96,12 +96,18 @@ pub async fn start_auth(
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     };
     
-    // Build the blockchain transaction
-    println!("🔨 Building transaction...");
+    // Create CLIENT transaction generator (not server's!)
+    let client_wallet = crate::wallet::get_wallet_for_command("web-client", None)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let network = kaspa_consensus_core::network::NetworkId::with_suffix(kaspa_consensus_core::network::NetworkType::Testnet, 10);
+    let client_generator = crate::episode_runner::create_auth_generator(client_wallet.keypair, network);
+    
+    // Build the blockchain transaction with CLIENT'S keys
+    println!("🔨 Building transaction with client's keys...");
     let tx = match std::panic::catch_unwind(|| {
-        state.transaction_generator.build_command_transaction(
+        client_generator.build_command_transaction(
             utxo, 
-            &server_addr, 
+            &client_addr, 
             &new_episode, 
             5000
         )
@@ -128,7 +134,8 @@ pub async fn start_auth(
         }
         Err(e) => {
             println!("❌ Transaction submission failed: {}", e);
-            println!("💡 Make sure server wallet is funded: {}", server_addr);
+            println!("💡 Make sure client wallet is funded: {}", client_addr);
+            println!("🚰 Get testnet funds: https://faucet.kaspanet.io/");
             "transaction_submission_failed"
         }
     };

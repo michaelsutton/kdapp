@@ -99,8 +99,12 @@ pub async fn request_challenge(
         client_pubkey
     );
     
-    // Build and submit transaction to blockchain (exactly like CLI)
-    let tx = state.transaction_generator.build_command_transaction(utxo, &server_addr, &step, 5000);
+    // Create CLIENT transaction generator (not server's!)
+    let network = kaspa_consensus_core::network::NetworkId::with_suffix(kaspa_consensus_core::network::NetworkType::Testnet, 10);
+    let client_generator = crate::episode_runner::create_auth_generator(client_wallet.keypair, network);
+    
+    // Build and submit transaction to blockchain with CLIENT'S keys
+    let tx = client_generator.build_command_transaction(utxo, &client_addr, &step, 5000);
     println!("🚀 Submitting RequestChallenge transaction: {}", tx.id());
     
     let submission_result = match state.kaspad_client.as_ref().unwrap().submit_transaction(tx.as_ref().into(), false).await {
