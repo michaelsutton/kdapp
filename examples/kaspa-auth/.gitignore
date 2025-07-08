@@ -12,6 +12,7 @@ Cargo.lock
 # Development folders (exclude from git)
 day_6/
 day_*/
+opus_4/
 
 # Future development modules (not part of kaspa-auth example)
 episode-contract/
@@ -22,6 +23,12 @@ kaspa-poker-tournament/
 *.temp
 *.sh
 server.log
+backup_log.txt
+server_debug.log
+server_direct.log
+fix_404_issue.sh
+quick_debug.sh
+test_*.sh
 
 # Logs
 *.log

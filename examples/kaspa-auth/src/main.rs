@@ -10,7 +10,7 @@ use kaspa_auth::core::commands::AuthCommand;
 use kaspa_auth::{AuthServerConfig, run_auth_server};
 use kaspa_auth::wallet::get_wallet_for_command;
 use kaspa_auth::api::http::server::run_http_server;
-use kaspa_auth::api::http::endpoints::get_api_endpoints;
+
 use kaspa_auth::cli::commands::test_api_flow::TestApiFlowCommand;
 use kdapp::pki::{generate_keypair, sign_message, to_message};
 use kdapp::episode::{PayloadMetadata, Episode};
@@ -161,10 +161,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         .help("Kaspa node RPC URL (e.g., grpc://127.0.0.1:16110)")
                 )
         )
-        .subcommand(
-            Command::new("list-endpoints")
-                .about("List all available API endpoints")
-        )
+        
         .subcommand(
             Command::new("test-api-flow")
                 .about("Run a full API authentication flow test")
@@ -292,12 +289,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             
             run_kaspa_client(kaspa_keypair, wallet.keypair, should_auth, rpc_url).await?;
         }
-        Some(("list-endpoints", _)) => {
-            println!("Available API Endpoints:");
-            for endpoint in get_api_endpoints() {
-                println!("  {:>4} {:<30} - {}", endpoint.method, endpoint.path, endpoint.description);
-            }
-        }
+        
         Some(("test-api-flow", sub_matches)) => {
             let server_url = sub_matches.get_one::<String>("server").unwrap().clone();
             let command = TestApiFlowCommand { server: server_url };

@@ -9,17 +9,17 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 20px;
-            background: linear-gradient(135deg, #70c7ba 0%, #5db3a8 100%);
+            background: linear-gradient(135deg, #232526 0%, #414345 100%);
             min-height: 100vh;
-            color: #333;
+            color: #f3f3f3;
         }
         
         .container {
             max-width: 900px;
             margin: 0 auto;
-            background: white;
+            background: #23272f;
             border-radius: 15px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
             padding: 40px;
         }
         
@@ -29,14 +29,27 @@
         }
         
         .header h1 {
-            color: #4a5568;
+            color: #fff;
             margin-bottom: 10px;
             font-size: 2.5em;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 8px #0008;
         }
         
         .header p {
-            color: #718096;
+            color: #b0b0b0;
             font-size: 1.1em;
+        }
+        
+        .logo-image {
+            width: 180px;
+            max-width: 100%;
+            display: block;
+            margin: 0 auto 20px auto;
+            border-radius: 50%;
+            box-shadow: 0 0 40px 0 #fff8, 0 0 20px 0 #70c7ba44;
+            background: #fff;
+            border: 4px solid #fff;
         }
         
         .status-bar {
@@ -44,10 +57,11 @@
             justify-content: space-between;
             align-items: center;
             padding: 15px;
-            background: #f7fafc;
+            background: #23272f;
             border-radius: 10px;
             margin-bottom: 30px;
-            border-left: 4px solid #48bb78;
+            border-left: 4px solid #70c7ba;
+            color: #fff;
         }
         
         .connection-status {
@@ -58,20 +72,22 @@
         }
         
         .connected {
-            background: #c6f6d5;
-            color: #22543d;
+            background: #2ecc40;
+            color: #fff;
         }
         
         .disconnected {
-            background: #fed7d7;
-            color: #742a2a;
+            background: #e53e3e;
+            color: #fff;
         }
         
         .auth-section {
-            background: #f8f9fa;
+            background: #23272f;
             padding: 30px;
             border-radius: 12px;
             margin-bottom: 30px;
+            position: relative;
+            box-shadow: 0 2px 12px #0004;
         }
         
         .auth-button {
@@ -88,16 +104,58 @@
             max-width: 300px;
             display: block;
             margin: 0 auto;
+            box-shadow: 0 2px 8px #0004;
         }
         
         .auth-button:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(112, 199, 186, 0.3);
+            transform: translateY(-2px) scale(1.03);
+            box-shadow: 0 8px 25px #70c7ba55;
         }
         
         .auth-button:disabled {
             opacity: 0.6;
             cursor: not-allowed;
+        }
+        
+        /* Redesigned reset button */
+        .reset-btn {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            background: #e53e3e;
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 38px;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3em;
+            cursor: pointer;
+            box-shadow: 0 2px 8px #0006;
+            transition: background 0.2s, transform 0.2s;
+            z-index: 2;
+        }
+        .reset-btn:hover {
+            background: #ff5555;
+            transform: scale(1.08);
+        }
+        .reset-btn:focus {
+            outline: 2px solid #fff;
+        }
+        .reset-btn[title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            top: 45px;
+            right: 0;
+            background: #23272f;
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            white-space: nowrap;
+            box-shadow: 0 2px 8px #0008;
         }
         
         .progress-indicator {
@@ -181,16 +239,17 @@
         }
         
         .info-card {
-            background: white;
+            background: #23272f;
             padding: 20px;
             border-radius: 10px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid #333a;
+            color: #f3f3f3;
         }
         
         .info-card h3 {
             margin-top: 0;
-            color: #4a5568;
-            border-bottom: 2px solid #e2e8f0;
+            color: #fff;
+            border-bottom: 2px solid #333a;
             padding-bottom: 10px;
         }
         
@@ -225,7 +284,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔐 Kaspa Auth Dashboard</h1>
+            <img src="/assets/kdapp_framework.jpg" alt="White Rabbit Motif" class="logo-image" />
+            <h1>Kaspa Auth Dashboard</h1>
             <p>Secure blockchain-based authentication with real-time updates</p>
         </div>
         
@@ -261,23 +321,23 @@
         </div>
         
         <div class="auth-section">
+            <button class="reset-btn" onclick="resetEpisodes()" title="Reset Episodes">
+                🗑️
+            </button>
             <h2>🚀 Quick Authentication Test</h2>
             <p>Test the complete authentication flow with auto-generated keypair</p>
-            <div style="background: #dcfce7; border: 1px solid #86efac; border-radius: 5px; padding: 10px; margin: 10px 0; font-size: 0.9em;">
+            <div style="background: #dcfce7; border: 1px solid #86efac; border-radius: 5px; padding: 10px; margin: 10px 0; font-size: 0.9em; color: #111;">
                 <strong>🔐 Real Blockchain Authentication:</strong> This Web UI generates real secp256k1 keypairs, 
                 signs challenges with actual cryptography, and submits verification to Kaspa blockchain.
                 <br><strong>⚡ Live Experience:</strong> Watch real-time blockchain confirmation via WebSocket!
             </div>
-            <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 10px; margin: 10px 0; font-size: 0.9em;">
+            <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 10px; margin: 10px 0; font-size: 0.9em; color: #111;">
                 <strong>🔍 Address Investigation:</strong> The server address above only shows coordination (1000 TKAS funding). 
                 For AUTH transactions, check the <strong>client address</strong> shown in browser console after clicking authenticate!
                 <br><strong>📊 Authentication reuses the SAME client address</strong> - persistent episodes until reset.
             </div>
             <button id="authButton" class="auth-button" onclick="startAuthentication()">
                 🔑 Start Authentication Flow
-            </button>
-            <button class="auth-button" onclick="resetEpisodes()" style="background-color: #dc3545; margin-left: 10px;">
-                🗑️ Reset Episodes (Create New)
             </button>
             
             <div id="progressIndicator" class="progress-indicator">
@@ -328,7 +388,7 @@
         </div>
         
         <div class="info-grid">
-            <div class="info-card">
+            <div class="info-card" style="color: #111;">
                 <h3>📡 Available Endpoints</h3>
                 <div class="endpoint-list">
                     <div class="endpoint-item">
@@ -355,7 +415,7 @@
                 </div>
             </div>
             
-            <div class="info-card">
+            <div class="info-card" style="color: #111;">
                 <h3>🔌 WebSocket Events</h3>
                 <div class="endpoint-list">
                     <div class="endpoint-item">challenge_issued</div>
@@ -365,7 +425,7 @@
                 </div>
             </div>
             
-            <div class="info-card">
+            <div class="info-card" style="color: #111;">
                 <h3>🛠️ Development Tools</h3>
                 <div class="endpoint-list">
                     <div class="endpoint-item">

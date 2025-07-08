@@ -131,7 +131,7 @@ impl TestApiCommand {
                 description: "Create authentication episode", 
                 needs_data: true,
                 test_data: Some(serde_json::json!({
-                    "public_key": "033f5f5a7a5d5f5a5d5f5a5d5f5a5d5f5a5d5f5a5d5f5a5d5f5a5d5f5a5d5f5a5d"
+                    "public_key": "02DUMMY_TEST_PUBLIC_KEY_NOT_FOR_PRODUCTION_USE_ONLY_FOR_TESTING_PURPOSES"
                 })),
             },
             ApiEndpoint {
@@ -141,7 +141,7 @@ impl TestApiCommand {
                 needs_data: true,
                 test_data: Some(serde_json::json!({
                     "episode_id": 12345,
-                    "public_key": "033f5f5a7a5d5f5a5d5f5a5d5f5a5d5f5a5d5f5a5d5f5a5d5f5a5d5f5a5d5f5a5d"
+                    "public_key": "02DUMMY_TEST_PUBLIC_KEY_NOT_FOR_PRODUCTION_USE_ONLY_FOR_TESTING_PURPOSES"
                 })),
             },
             ApiEndpoint {
@@ -151,7 +151,7 @@ impl TestApiCommand {
                 needs_data: true,
                 test_data: Some(serde_json::json!({
                     "episode_id": "DYNAMIC_EPISODE_ID",
-                    "public_key": "033f5f5a7a5d5f5a5d5f5a5d5f5a5d5f5a5d5f5a5d5f5a5d5f5a5d5f5a5d5f5a5d"
+                    "public_key": "02DUMMY_TEST_PUBLIC_KEY_NOT_FOR_PRODUCTION_USE_ONLY_FOR_TESTING_PURPOSES"
                 })),
             },
             ApiEndpoint {
@@ -161,7 +161,7 @@ impl TestApiCommand {
                 needs_data: true,
                 test_data: Some(serde_json::json!({
                     "challenge": "auth_1234567890",
-                    "private_key": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+                    "private_key": "DUMMY_TEST_KEY_NOT_FOR_PRODUCTION_USE_ONLY_FOR_TESTING_PURPOSES_DUMMY"
                 })),
             },
             ApiEndpoint {
