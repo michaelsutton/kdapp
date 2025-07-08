@@ -1,26 +1,50 @@
+// src/api/http/types.rs
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
-pub struct StartAuthRequest;
-
-#[derive(Serialize, Deserialize)]
-pub struct StartAuthResponse;
-
-#[derive(Serialize, Deserialize)]
-pub struct RequestChallengeRequest;
-
-#[derive(Serialize, Deserialize)]
-pub struct ChallengeResponse;
-
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct AuthRequest {
-    pub signature: String,
-    pub nonce: String,
-    pub client_pubkey: String,
+    // Intentionally empty for now
+    pub public_key: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct AuthResponse {
+    pub episode_id: u64,
+    pub server_public_key: String,
+    pub client_kaspa_address: String,
+    pub transaction_id: Option<String>,
+    pub status: String,
+}
+
+#[derive(Deserialize)]
+pub struct ChallengeRequest {
+    pub episode_id: u64,
+    pub public_key: String,
+}
+
+#[derive(Serialize)]
+pub struct ChallengeResponse {
+    pub episode_id: u64,
+    pub nonce: String,
+}
+
+#[derive(Deserialize)]
+pub struct VerifyRequest {
+    pub episode_id: u64,
+    pub signature: String,
+    pub nonce: String,
+}
+
+#[derive(Serialize)]
+pub struct VerifyResponse {
+    pub episode_id: u64,
     pub authenticated: bool,
-    pub session_token: Option<String>,
+    pub status: String,
+}
+
+#[derive(Serialize)]
+pub struct EpisodeStatus {
+    pub episode_id: u64,
+    pub authenticated: bool,
+    pub status: String,
 }

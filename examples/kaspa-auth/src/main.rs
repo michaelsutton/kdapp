@@ -1,5 +1,5 @@
 use clap::{Arg, Command};
-use env_logger;
+
 use std::error::Error;
 use secp256k1::{Secp256k1, SecretKey, Keypair};
 use log::info;
@@ -8,7 +8,10 @@ use kaspa_addresses;
 use kaspa_auth::core::episode::SimpleAuth;
 use kaspa_auth::core::commands::AuthCommand;
 use kaspa_auth::{AuthServerConfig, run_auth_server};
+use kaspa_auth::wallet::get_wallet_for_command;
 use kaspa_auth::api::http::server::run_http_server;
+
+use kaspa_auth::cli::commands::test_api_flow::TestApiFlowCommand;
 use kdapp::pki::{generate_keypair, sign_message, to_message};
 use kdapp::episode::{PayloadMetadata, Episode};
 // use crate::cli::Cli; // Using inline clap structure instead
@@ -16,8 +19,8 @@ use kdapp::episode::{PayloadMetadata, Episode};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    // Initialize logger with clean output - hide debug spam from kdapp internals
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("kaspa_auth=info,kdapp::generator=error,kdapp=warn")).init();
+    // Initialize tracing for better logging
+    tracing_subscriber::fmt::init();
 
     let matches = Command::new("kaspa-auth")
         .version("0.1.0")
@@ -146,10 +149,41 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         .help("Kaspa private key for funding transactions (hex format)")
                 )
                 .arg(
+                    Arg::new("kaspa-keyfile")
+                        .long("kaspa-keyfile")
+                        .value_name("FILE")
+                        .help("Load Kaspa private key from file (safer than --kaspa-private-key)")
+                )
+                .arg(
                     Arg::new("rpc-url")
                         .long("rpc-url")
                         .value_name("URL")
                         .help("Kaspa node RPC URL (e.g., grpc://127.0.0.1:16110)")
+                )
+        )
+        
+        .subcommand(
+            Command::new("test-api-flow")
+                .about("Run a full API authentication flow test")
+                .arg(
+                    Arg::new("server")
+                        .short('s')
+                        .long("server")
+                        .value_name("URL")
+                        .help("HTTP server URL")
+                        .default_value("http://127.0.0.1:8080")
+                )
+        )
+        .subcommand(
+            Command::new("test-api")
+                .about("Run tests against all API endpoints")
+                .arg(
+                    Arg::new("server")
+                        .short('s')
+                        .long("server")
+                        .value_name("URL")
+                        .help("HTTP server URL")
+                        .default_value("http://127.0.0.1:8080")
                 )
         )
         .get_matches();
@@ -171,30 +205,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 .parse()
                 .unwrap_or(8080);
             
-            let keypair = if let Some(key_hex) = sub_matches.get_one::<String>("key") {
-                parse_private_key(key_hex)?
-            } else {
-                generate_random_keypair()
-            };
-            
-            info!("🔑 HTTP Server public key: {}", hex::encode(keypair.public_key().serialize()));
-            run_http_server(keypair, port).await?;
+            let provided_private_key = sub_matches.get_one::<String>("key").map(|s| s.as_str());
+            run_http_server(provided_private_key, port).await?;
         }
         Some(("authenticate", sub_matches)) => {
             let server_url = sub_matches.get_one::<String>("server").unwrap().clone();
             
-            // Get private key from various sources
+            // Get private key using unified wallet system
             let keypair = if let Some(keyfile_path) = sub_matches.get_one::<String>("keyfile") {
                 load_private_key_from_file(keyfile_path)?
-            } else if let Some(key_hex) = sub_matches.get_one::<String>("key") {
-                parse_private_key(key_hex)?
             } else {
-                // Generate a random key for this session (safer than hardcoded)
-                println!("🔑 No key provided - generating random keypair for this session");
-                println!("📝 For production, use: --key YOUR_PRIVATE_KEY or --keyfile YOUR_KEYFILE");
-                println!("⚠️  This random key will only work if server uses the same key!");
-                println!();
-                generate_random_keypair()
+                let provided_private_key = sub_matches.get_one::<String>("key").map(|s| s.as_str());
+                let wallet = get_wallet_for_command("authenticate", provided_private_key)?;
+                wallet.keypair
             };
             
             println!("🚀 Starting automatic authentication with server: {}", server_url);
@@ -204,23 +227,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
             run_interactive_demo()?;
         }
         Some(("server", sub_matches)) => {
+            use kaspa_auth::wallet::get_wallet_for_command;
+            
             let name = sub_matches.get_one::<String>("name").unwrap().clone();
             let rpc_url = sub_matches.get_one::<String>("rpc-url").cloned();
-            let keypair = if let Some(key_hex) = sub_matches.get_one::<String>("key") {
-                parse_private_key(key_hex)?
-            } else {
-                generate_random_keypair()
-            };
+            let provided_private_key = sub_matches.get_one::<String>("key").map(|s| s.as_str());
             
-            info!("🔑 Server public key: {}", hex::encode(keypair.public_key().serialize()));
-            run_kaspa_server(keypair, name, rpc_url).await?;
+            let wallet = get_wallet_for_command("server", provided_private_key)?;
+            run_kaspa_server(wallet.keypair, name, rpc_url).await?;
         }
         Some(("client", sub_matches)) => {
             let should_auth = sub_matches.get_flag("auth");
             let rpc_url = sub_matches.get_one::<String>("rpc-url").cloned();
             
             // Get Kaspa keypair (for funding transactions)
-            let kaspa_keypair = if let Some(kaspa_key_hex) = sub_matches.get_one::<String>("kaspa-private-key") {
+            let kaspa_keypair = if let Some(kaspa_keyfile_path) = sub_matches.get_one::<String>("kaspa-keyfile") {
+                load_private_key_from_file(kaspa_keyfile_path)?
+            } else if let Some(kaspa_key_hex) = sub_matches.get_one::<String>("kaspa-private-key") {
                 parse_private_key(kaspa_key_hex)?
             } else if should_auth {
                 // If doing auth and no kaspa key provided, show how to generate one
@@ -230,26 +253,56 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     kaspa_addresses::Version::PubKey,
                     &keypair.x_only_public_key().0.serialize()
                 );
-                println!("No --kaspa-private-key provided. Generated:");
-                println!("Kaspa Address: {}", kaspa_addr);
-                println!("Private Key: {}", hex::encode(keypair.secret_key().secret_bytes()));
+                println!("🔑 No --kaspa-private-key or --kaspa-keyfile provided. Generated new client wallet:");
+                println!("📍 Kaspa Address: {}", kaspa_addr);
+                println!("🔐 Private Key: {}", hex::encode(keypair.secret_key().secret_bytes()));
                 println!();
-                println!("Send testnet funds to this address, then run:");
+                println!("💾 Save the private key to a file for security:");
+                println!("echo '{}' > kaspa_private.key", hex::encode(keypair.secret_key().secret_bytes()));
+                println!();
+                println!("💰 FUNDING REQUIRED: Get testnet Kaspa for blockchain authentication");
+                println!("🚰 Faucet URL: https://faucet.kaspanet.io/");
+                println!("🌐 Network: testnet-10 (for development and testing)");
+                println!("💡 Amount needed: ~0.1 KAS (covers multiple authentication transactions)");
+                println!();
+                println!("📋 Steps to fund your client wallet:");
+                println!("  1. Copy the Kaspa address above: {}", kaspa_addr);
+                println!("  2. Visit: https://faucet.kaspanet.io/");
+                println!("  3. Paste the address and request testnet funds");
+                println!("  4. Wait ~30 seconds for transaction confirmation");
+                println!();
+                println!("🚀 After funding, run blockchain authentication:");
+                println!("cargo run -p kaspa-auth -- client --auth --kaspa-keyfile kaspa_private.key");
+                println!("or");
                 println!("cargo run -p kaspa-auth -- client --auth --kaspa-private-key {}", hex::encode(keypair.secret_key().secret_bytes()));
+                println!();
+                println!("🎯 This will create REAL blockchain transactions on Kaspa testnet-10!");
+                println!("📊 You can verify transactions at: https://explorer.kaspa.org/");
                 return Ok(());
             } else {
                 generate_random_keypair()
             };
             
             // Get auth keypair (for episode authentication)
-            let auth_keypair = if let Some(key_hex) = sub_matches.get_one::<String>("key") {
-                parse_private_key(key_hex)?
-            } else {
-                generate_random_keypair()
-            };
+            let provided_private_key = sub_matches.get_one::<String>("key").map(|s| s.as_str());
+            let wallet = get_wallet_for_command("client", provided_private_key)?;
             
-            info!("🔑 Auth public key: {}", hex::encode(auth_keypair.public_key().serialize()));
-            run_kaspa_client(kaspa_keypair, auth_keypair, should_auth, rpc_url).await?;
+            run_kaspa_client(kaspa_keypair, wallet.keypair, should_auth, rpc_url).await?;
+        }
+        
+        Some(("test-api-flow", sub_matches)) => {
+            let server_url = sub_matches.get_one::<String>("server").unwrap().clone();
+            let command = TestApiFlowCommand { server: server_url };
+            command.execute().await?;
+        }
+        Some(("test-api", sub_matches)) => {
+            let server_url = sub_matches.get_one::<String>("server").unwrap().clone();
+            let command = kaspa_auth::cli::commands::test_api::TestApiCommand { 
+                server: server_url, 
+                verbose: false, 
+                json: false 
+            };
+            command.execute().await?;
         }
         _ => {
             println!("No subcommand specified. Use --help for available commands.");
@@ -472,10 +525,14 @@ async fn run_kaspa_client(kaspa_signer: Keypair, auth_signer: Keypair, should_au
     }
     
     if should_auth {
-        println!("🚀 Initiating authentication flow...");
+        println!("🚀 Initiating blockchain authentication flow...");
+        println!("🎯 This will create REAL transactions on Kaspa testnet-10");
         run_client_authentication(kaspa_signer, auth_signer).await?;
     } else {
-        println!("👂 Listening for authentication requests...");
+        println!("👂 Client mode: Listening for authentication requests...");
+        println!("💡 Tip: Add --auth flag to initiate authentication instead of listening");
+        println!("📖 Example: cargo run -- client --auth --kaspa-keyfile your_key.txt");
+        println!();
         // For now, just run a server instance
         let config = AuthServerConfig::new(kaspa_signer, "auth-client".to_string(), rpc_url);
         run_auth_server(config).await?;

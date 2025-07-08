@@ -1,312 +1,189 @@
 // src/api/http/server.rs
-use axum::{routing::{get, post}, Router, response::Json, extract::{Path, State}, http::StatusCode};
-use secp256k1::Keypair;
+use axum::{routing::{get, post}, Router, extract::State};
 use axum::serve;
+use std::sync::Arc;
+use tokio::sync::broadcast;
+use kdapp::generator::TransactionGenerator;
+use crate::wallet::get_wallet_for_command;
+use crate::episode_runner::create_auth_generator;
+use kaspa_consensus_core::network::{NetworkId, NetworkType};
+use tower_http::cors::{CorsLayer, Any};
+use tower_http::services::ServeDir;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use serde::{Deserialize, Serialize};
-use kdapp::pki::{sign_message, to_message};
+use std::sync::Mutex;
+use secp256k1::Keypair;
 
-// Episode storage with full state
-#[derive(Clone, Debug)]
-struct EpisodeState {
-    episode_id: u64,
-    public_key: String,
-    challenge: Option<String>,
-    authenticated: bool,
-    session_token: Option<String>,
-}
+use crate::api::http::{
+    state::{ServerState, EpisodeState, WebSocketMessage},
+    types::*,
+    handlers::{
+        auth::start_auth,
+        challenge::request_challenge,
+        verify::verify_auth,
+        status::get_status,
+    },
+    blockchain_engine::AuthHttpServer,
+};
+use crate::api::websocket::server::websocket_handler;
+use axum::Json;
+use serde_json::json;
+use kaspa_addresses::{Address, Prefix, Version};
 
-type EpisodeStorage = Arc<Mutex<HashMap<u64, EpisodeState>>>;
-
-// Request/Response types
-#[derive(Deserialize)]
-struct StartAuthRequest {
-    public_key: String,
-}
-
-#[derive(Deserialize)]
-struct RegisterEpisodeRequest {
-    episode_id: u64,
-    public_key: String,
-}
-
-#[derive(Serialize)]
-struct StartAuthResponse {
-    episode_id: u64,
-    status: String,
-}
-
-#[derive(Deserialize)]
-struct RequestChallengeRequest {
-    episode_id: u64,
-    public_key: String,
-}
-
-#[derive(Serialize)]
-struct ChallengeResponse {
-    episode_id: u64,
-    status: String,
-    message: String,
-}
-
-#[derive(Deserialize)]
-struct SignChallengeRequest {
-    challenge: String,
-    private_key: String,
-}
-
-#[derive(Serialize)]
-struct SignChallengeResponse {
-    challenge: String,
-    signature: String,
-    public_key: String,
-}
-
-#[derive(Deserialize)]
-struct VerifyRequest {
-    episode_id: u64,
-    signature: String,
-    nonce: String,
-}
-
-#[derive(Serialize)]
-struct VerifyResponse {
-    episode_id: u64,
-    authenticated: bool,
-    status: String,
-}
-
-#[derive(Serialize)]
-struct StatusResponse {
-    episode_id: u64,
-    authenticated: bool,
-    challenge: Option<String>,
-    session_token: Option<String>,
-    status: String,
-}
-
-pub async fn run_http_server(keypair: Keypair, port: u16) -> Result<(), Box<dyn std::error::Error>> {
-    let episode_storage: EpisodeStorage = Arc::new(Mutex::new(HashMap::new()));
+// Simple endpoint handlers
+async fn funding_info(State(state): State<ServerState>) -> Json<serde_json::Value> {
+    let kaspa_addr = Address::new(
+        Prefix::Testnet, 
+        Version::PubKey, 
+        &state.server_keypair.x_only_public_key().0.serialize()
+    );
     
-    async fn hello_world() -> Json<serde_json::Value> {
-        Json(serde_json::json!({"message": "Kaspa Auth HTTP Server", "status": "running"}))
+    Json(json!({
+        "funding_address": kaspa_addr.to_string(),
+        "network": "testnet-10",
+        "transaction_prefix": "0x41555448",
+        "transaction_prefix_meaning": "AUTH"
+    }))
+}
+
+async fn wallet_status() -> Json<serde_json::Value> {
+    // Check if web-client wallet exists
+    match get_wallet_for_command("web-client", None) {
+        Ok(wallet) => {
+            let kaspa_addr = Address::new(
+                Prefix::Testnet,
+                Version::PubKey,
+                &wallet.keypair.x_only_public_key().0.serialize()
+            );
+            
+            Json(json!({
+                "exists": true,
+                "needs_funding": true,  // Always true for now - could check balance later
+                "kaspa_address": kaspa_addr.to_string(),
+                "was_created": wallet.was_created
+            }))
+        }
+        Err(_) => {
+            Json(json!({
+                "exists": false,
+                "needs_funding": true,
+                "kaspa_address": "Will be created on first authentication"
+            }))
+        }
     }
+}
+
+async fn wallet_client() -> Json<serde_json::Value> {
+    // Create a real client wallet (like CLI does)
+    match get_wallet_for_command("web-client", None) {
+        Ok(wallet) => {
+            let public_key_hex = hex::encode(wallet.keypair.public_key().serialize());
+            let kaspa_addr = Address::new(
+                Prefix::Testnet,
+                Version::PubKey,
+                &wallet.keypair.x_only_public_key().0.serialize()
+            );
+            
+            Json(json!({
+                "public_key": public_key_hex,
+                "kaspa_address": kaspa_addr.to_string(),
+                "was_created": wallet.was_created,
+                "needs_funding": true  // Always true for web clients for now
+            }))
+        }
+        Err(e) => {
+            Json(json!({
+                "error": format!("Failed to create client wallet: {}", e),
+                "public_key": "error",
+                "kaspa_address": "error",
+                "was_created": false,
+                "needs_funding": true
+            }))
+        }
+    }
+}
+
+async fn sign_challenge(Json(req): Json<serde_json::Value>) -> Json<serde_json::Value> {
+    // Extract challenge and handle client wallet signing
+    let challenge = req["challenge"].as_str().unwrap_or("");
+    let private_key_hint = req["private_key"].as_str().unwrap_or("");
+    
+    if private_key_hint == "use_client_wallet" {
+        // Use the web-client wallet to sign
+        match get_wallet_for_command("web-client", None) {
+            Ok(wallet) => {
+                // Sign the challenge with the client wallet
+                let message = kdapp::pki::to_message(&challenge.to_string());
+                let signature = kdapp::pki::sign_message(&wallet.keypair.secret_key(), &message);
+                let signature_hex = hex::encode(signature.0.serialize_der());
+                let public_key_hex = hex::encode(wallet.keypair.public_key().serialize());
+                
+                Json(json!({
+                    "challenge": challenge,
+                    "signature": signature_hex,
+                    "public_key": public_key_hex
+                }))
+            }
+            Err(e) => {
+                Json(json!({
+                    "error": format!("Failed to sign challenge: {}", e)
+                }))
+            }
+        }
+    } else {
+        Json(json!({
+            "error": "Invalid signing request"
+        }))
+    }
+}
+
+pub async fn run_http_server(provided_private_key: Option<&str>, port: u16) -> Result<(), Box<dyn std::error::Error>> {
+    let wallet = get_wallet_for_command("http-server", provided_private_key)?;
+    let keypair = wallet.keypair;
+    
+    println!("🚀 Starting HTTP server with REAL kdapp blockchain integration");
+    
+    let (websocket_tx, _) = broadcast::channel::<WebSocketMessage>(100);
+    
+    // Create the AuthHttpServer with kdapp engine
+    let auth_server = Arc::new(AuthHttpServer::new(keypair, websocket_tx.clone()).await?);
+    let server_state = auth_server.server_state.clone();
+    
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(tower_http::cors::AllowMethods::any())
+        .allow_headers(Any);
 
     let app = Router::new()
-        .route("/", get(hello_world))
-        .route("/health", get(hello_world))
+        .route("/ws", get(websocket_handler))
+        .route("/funding-info", get(funding_info))
+        .route("/wallet/status", get(wallet_status))
+        .route("/wallet/client", get(wallet_client))
         .route("/auth/start", post(start_auth))
-        .route("/auth/register-episode", post(register_episode))
         .route("/auth/request-challenge", post(request_challenge))
         .route("/auth/sign-challenge", post(sign_challenge))
         .route("/auth/verify", post(verify_auth))
         .route("/auth/status/{episode_id}", get(get_status))
-        .route("/challenge/{episode_id}", get(get_challenge))
-        .with_state(episode_storage);
+        .fallback_service(ServeDir::new("public"))
+        .with_state(server_state)
+        .layer(cors);
 
     let addr = format!("0.0.0.0:{}", port);
-    println!("🚀 HTTP Authentication Server starting on port {}", port);
-    println!("🔑 Server public key: {}", hex::encode(keypair.public_key().serialize()));
-    println!("📡 Endpoints:");
-    println!("  GET  /                           - Server info");
-    println!("  GET  /health                     - Health check");
-    println!("  POST /auth/start                 - Create authentication episode");
-    println!("  POST /auth/register-episode      - Register blockchain episode with HTTP server");
-    println!("  POST /auth/request-challenge     - Request challenge from blockchain");
-    println!("  POST /auth/sign-challenge        - Sign challenge (helper endpoint)");
-    println!("  POST /auth/verify                - Submit authentication response");
-    println!("  GET  /auth/status/{{episode_id}}  - Get episode status");
-    println!("  GET  /challenge/{{episode_id}}   - Get challenge for episode (legacy)");
-    println!();
-    println!("✅ Server running! Example workflow:");
-    println!("  curl -X POST http://localhost:{}/auth/start -H 'Content-Type: application/json' -d '{{\"public_key\": \"YOUR_PUBKEY\"}}'", port);
-    
     let listener = tokio::net::TcpListener::bind(&addr).await?;
-    serve(listener, app.into_make_service()).await?;
-
-    Ok(())
-}
-
-// Handler implementations
-async fn start_auth(
-    State(storage): State<EpisodeStorage>,
-    Json(req): Json<StartAuthRequest>,
-) -> Result<Json<StartAuthResponse>, StatusCode> {
-    use rand::Rng;
-    let episode_id = rand::thread_rng().gen::<u64>();
     
-    let episode = EpisodeState {
-        episode_id,
-        public_key: req.public_key.clone(),
-        challenge: None,
-        authenticated: false,
-        session_token: None,
-    };
+    println!("🚀 HTTP Authentication Server starting on port {}", port);
+    println!("🔗 Starting kdapp blockchain engine...");
     
-    storage.lock().unwrap().insert(episode_id, episode);
-    
-    println!("📝 Created episode {} for public key: {}", episode_id, req.public_key);
-    
-    Ok(Json(StartAuthResponse {
-        episode_id,
-        status: "episode_created".to_string(),
-    }))
-}
-
-async fn register_episode(
-    State(storage): State<EpisodeStorage>,
-    Json(req): Json<RegisterEpisodeRequest>,
-) -> Result<Json<StartAuthResponse>, StatusCode> {
-    let episode = EpisodeState {
-        episode_id: req.episode_id,
-        public_key: req.public_key.clone(),
-        challenge: None,
-        authenticated: false,
-        session_token: None,
-    };
-    
-    storage.lock().unwrap().insert(req.episode_id, episode);
-    
-    println!("📝 Registered blockchain episode {} for public key: {}", req.episode_id, req.public_key);
-    
-    Ok(Json(StartAuthResponse {
-        episode_id: req.episode_id,
-        status: "episode_registered".to_string(),
-    }))
-}
-
-async fn request_challenge(
-    State(storage): State<EpisodeStorage>,
-    Json(req): Json<RequestChallengeRequest>,
-) -> Result<Json<ChallengeResponse>, StatusCode> {
-    use rand::Rng;
-    let challenge = format!("auth_{}", rand::thread_rng().gen::<u64>());
-    
-    if let Some(episode) = storage.lock().unwrap().get_mut(&req.episode_id) {
-        episode.challenge = Some(challenge.clone());
-        println!("🎲 Generated challenge {} for episode {}", challenge, req.episode_id);
-        
-        Ok(Json(ChallengeResponse {
-            episode_id: req.episode_id,
-            status: "challenge_requested".to_string(),
-            message: "RequestChallenge command sent to blockchain...".to_string(),
-        }))
-    } else {
-        Err(StatusCode::NOT_FOUND)
-    }
-}
-
-async fn sign_challenge(
-    Json(req): Json<SignChallengeRequest>,
-) -> Result<Json<SignChallengeResponse>, StatusCode> {
-    use secp256k1::{Secp256k1, SecretKey};
-    
-    // Parse private key
-    let secret_bytes = match hex::decode(&req.private_key) {
-        Ok(bytes) => bytes,
-        Err(_) => return Err(StatusCode::BAD_REQUEST),
-    };
-    
-    let secret_key = match SecretKey::from_slice(&secret_bytes) {
-        Ok(key) => key,
-        Err(_) => return Err(StatusCode::BAD_REQUEST),
-    };
-    
-    // Sign the challenge
-    let message = to_message(&req.challenge);
-    let signature = sign_message(&secret_key, &message);
-    let signature_hex = hex::encode(signature.0.serialize_der());
-    
-    // Get public key
-    let secp = Secp256k1::new();
-    let keypair = secp256k1::Keypair::from_secret_key(&secp, &secret_key);
-    let public_key_hex = hex::encode(keypair.public_key().serialize());
-    
-    println!("✍️ Signed challenge: {} with key: {}", req.challenge, public_key_hex);
-    
-    Ok(Json(SignChallengeResponse {
-        challenge: req.challenge,
-        signature: signature_hex,
-        public_key: public_key_hex,
-    }))
-}
-
-async fn verify_auth(
-    State(storage): State<EpisodeStorage>,
-    Json(req): Json<VerifyRequest>,
-) -> Result<Json<VerifyResponse>, StatusCode> {
-    use rand::Rng;
-    
-    if let Some(episode) = storage.lock().unwrap().get_mut(&req.episode_id) {
-        // In a real implementation, we would verify the signature here
-        // For now, we'll just mark as authenticated
-        episode.authenticated = true;
-        episode.session_token = Some(format!("sess_{}", rand::thread_rng().gen::<u64>()));
-        
-        println!("✅ Authenticated episode {}", req.episode_id);
-        
-        Ok(Json(VerifyResponse {
-            episode_id: req.episode_id,
-            authenticated: true,
-            status: "authenticated".to_string(),
-        }))
-    } else {
-        Err(StatusCode::NOT_FOUND)
-    }
-}
-
-async fn get_status(
-    State(storage): State<EpisodeStorage>,
-    Path(episode_id): Path<u64>,
-) -> Result<Json<StatusResponse>, StatusCode> {
-    if let Some(episode) = storage.lock().unwrap().get(&episode_id) {
-        let status = if episode.authenticated {
-            "authenticated"
-        } else if episode.challenge.is_some() {
-            "challenge_ready"
-        } else {
-            "pending"
-        };
-        
-        Ok(Json(StatusResponse {
-            episode_id: episode.episode_id,
-            authenticated: episode.authenticated,
-            challenge: episode.challenge.clone(),
-            session_token: episode.session_token.clone(),
-            status: status.to_string(),
-        }))
-    } else {
-        Err(StatusCode::NOT_FOUND)
-    }
-}
-
-// Legacy endpoint for backward compatibility
-async fn get_challenge(
-    State(storage): State<EpisodeStorage>,
-    Path(episode_id): Path<u64>,
-) -> Result<Json<serde_json::Value>, StatusCode> {
-    if let Some(episode) = storage.lock().unwrap().get(&episode_id) {
-        if let Some(ref challenge) = episode.challenge {
-            println!("📡 Legacy challenge request for episode: {}", episode_id);
-            
-            Ok(Json(serde_json::json!({
-                "episode_id": episode_id,
-                "challenge": challenge,
-                "status": "ready"
-            })))
-        } else {
-            // Generate challenge if none exists
-            use rand::Rng;
-            let challenge = format!("auth_{}", rand::thread_rng().gen::<u64>());
-            
-            Ok(Json(serde_json::json!({
-                "episode_id": episode_id,
-                "challenge": challenge,
-                "status": "generated"
-            })))
+    // Start the blockchain listener in the background
+    let auth_server_clone = auth_server.clone();
+    tokio::spawn(async move {
+        if let Err(e) = auth_server_clone.start_blockchain_listener().await {
+            eprintln!("❌ Blockchain listener error: {}", e);
         }
-    } else {
-        Err(StatusCode::NOT_FOUND)
-    }
+    });
+    
+    // Start the HTTP server
+    println!("✅ HTTP server is now a REAL kdapp blockchain node!");
+    serve(listener, app.into_make_service()).await?;
+    
+    Ok(())
 }

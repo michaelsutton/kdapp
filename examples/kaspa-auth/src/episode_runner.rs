@@ -8,6 +8,8 @@ use serde::{Serialize, Deserialize};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use rand::Rng;
+use reqwest::Client;
+use serde_json::json;
 
 use crate::{core::episode::SimpleAuth, core::commands::AuthCommand};
 
@@ -55,12 +57,39 @@ impl EpisodeEventHandler<SimpleAuth> for AuthEventHandler {
                     }
                 }
             }
-            AuthCommand::SubmitResponse { signature, nonce } => {
+            AuthCommand::SubmitResponse { signature: _, nonce } => {
                 info!("[{}] Episode {}: Response submitted with nonce: {}", 
                       self.name, episode_id, nonce);
                 if episode.is_authenticated {
                     info!("[{}] Episode {}: ✅ Authentication successful!", 
                           self.name, episode_id);
+                    
+                    // Notify HTTP server about successful authentication
+                    let client = Client::new();
+                    let episode_id_clone = episode_id;
+                    let challenge_clone = episode.challenge.clone().unwrap_or_default();
+                    tokio::spawn(async move {
+                        let url = "http://127.0.0.1:8080/internal/episode-authenticated"; // TODO: Make configurable
+                        let res = client.post(url)
+                            .json(&json!({
+                                "episode_id": episode_id_clone,
+                                "challenge": challenge_clone,
+                            }))
+                            .send()
+                            .await;
+                        
+                        match res {
+                            Ok(response) if response.status().is_success() => {
+                                info!("Successfully notified HTTP server for episode {}", episode_id_clone);
+                            },
+                            Ok(response) => {
+                                error!("Failed to notify HTTP server for episode {}: Status {}", episode_id_clone, response.status());
+                            },
+                            Err(e) => {
+                                error!("Failed to notify HTTP server for episode {}: Error {}", episode_id_clone, e);
+                            }
+                        }
+                    });
                 } else {
                     warn!("[{}] Episode {}: ❌ Authentication failed - invalid signature", 
                           self.name, episode_id);
@@ -80,7 +109,7 @@ pub struct AuthServerConfig {
     pub network: NetworkId,
     pub rpc_url: Option<String>,
     pub name: String,
-    pub http_port: u16,
+    
 }
 
 /// Simple HTTP coordination structures
@@ -121,7 +150,7 @@ impl AuthServerConfig {
             network: NetworkId::with_suffix(NetworkType::Testnet, 10),
             rpc_url,
             name,
-            http_port: 8080,
+            
         }
     }
 }
@@ -165,23 +194,7 @@ pub async fn run_auth_server(config: AuthServerConfig) -> Result<(), Box<dyn std
     info!("👂 Listening for auth transactions with prefix: 0x{:08X}", AUTH_PREFIX);
     info!("🔍 Using pattern: {:?}", AUTH_PATTERN);
 
-    // 6. Start simple HTTP coordination server
-    let coordination_state = CoordinationState {
-        challenges: Arc::new(Mutex::new(HashMap::new())),
-        episode_challenges: episode_challenges.clone(),
-    };
     
-    let http_addr = format!("127.0.0.1:{}", config.http_port);
-    info!("🌐 Starting HTTP coordination server on {}", http_addr);
-    
-    let episode_challenges_clone = coordination_state.episode_challenges.clone();
-    let exit_signal_http = exit_signal.clone();
-    
-    tokio::spawn(async move {
-        if let Err(e) = run_simple_http_server(&http_addr, episode_challenges_clone, exit_signal_http).await {
-            error!("HTTP server error: {}", e);
-        }
-    });
 
     // 7. Start proxy listener
     proxy::run_listener(kaspad, engines, exit_signal).await;
@@ -203,101 +216,7 @@ pub fn create_auth_generator(signer: Keypair, _network: NetworkId) -> Transactio
     )
 }
 
-/// Simple HTTP server for coordination
-async fn run_simple_http_server(
-    addr: &str, 
-    episode_challenges: Arc<Mutex<HashMap<u64, String>>>,
-    exit_signal: Arc<AtomicBool>
-) -> Result<(), Box<dyn std::error::Error>> {
-    let listener = TcpListener::bind(addr).await?;
-    info!("HTTP coordination server listening on {}", addr);
-    
-    while !exit_signal.load(std::sync::atomic::Ordering::Relaxed) {
-        tokio::select! {
-            result = listener.accept() => {
-                match result {
-                    Ok((stream, _)) => {
-                        let episode_challenges_clone = episode_challenges.clone();
-                        tokio::spawn(async move {
-                            if let Err(e) = handle_http_request(stream, episode_challenges_clone).await {
-                                error!("Error handling HTTP request: {}", e);
-                            }
-                        });
-                    }
-                    Err(e) => {
-                        error!("Error accepting connection: {}", e);
-                    }
-                }
-            }
-            _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {
-                // Check exit signal periodically
-            }
-        }
-    }
-    
-    Ok(())
-}
 
-/// Handle individual HTTP requests
-async fn handle_http_request(
-    mut stream: TcpStream,
-    episode_challenges: Arc<Mutex<HashMap<u64, String>>>
-) -> Result<(), Box<dyn std::error::Error>> {
-    let mut buffer = [0; 1024];
-    let n = stream.read(&mut buffer).await?;
-    let request = String::from_utf8_lossy(&buffer[..n]);
-    
-    // Parse HTTP request (very basic parsing) - NOW ONLY FOR COORDINATION
-    if request.starts_with("GET /status") {
-        // Simple status endpoint for coordination
-        let response = r#"{"status": "kdapp auth server running", "blockchain": "active"}"#;
-        let http_response = format!(
-            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
-            response.len(),
-            response
-        );
-        
-        stream.write_all(http_response.as_bytes()).await?;
-        return Ok(());
-    } else if request.starts_with("GET /challenge/") {
-        // Extract episode ID from URL path
-        if let Some(path_start) = request.find("GET /challenge/") {
-            let path = &request[path_start + 15..];
-            if let Some(space_pos) = path.find(' ') {
-                let episode_id_str = &path[..space_pos];
-                if let Ok(episode_id) = episode_id_str.parse::<u64>() {
-                    // Get real challenge from episode state  
-                    let challenge_response = {
-                        if let Ok(challenges) = episode_challenges.lock() {
-                            if let Some(challenge) = challenges.get(&episode_id) {
-                                format!(r#"{{"episode_id": {}, "challenge": "{}", "available": true}}"#, episode_id, challenge)
-                            } else {
-                                format!(r#"{{"episode_id": {}, "error": "Challenge not yet available", "available": false}}"#, episode_id)
-                            }
-                        } else {
-                            format!(r#"{{"episode_id": {}, "error": "Server error", "available": false}}"#, episode_id)
-                        }
-                    };
-                    
-                    let http_response = format!(
-                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
-                        challenge_response.len(),
-                        challenge_response
-                    );
-                    
-                    stream.write_all(http_response.as_bytes()).await?;
-                    return Ok(());
-                }
-            }
-        }
-    }
-    
-    // Default 404 response
-    let not_found = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
-    stream.write_all(not_found.as_bytes()).await?;
-    
-    Ok(())
-}
 
 #[cfg(test)]
 mod tests {

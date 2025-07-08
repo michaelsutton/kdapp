@@ -1,4 +1,9 @@
+// src/api/http/mod.rs
 pub mod server;
-pub mod handlers;
-pub mod middleware;
+pub mod state;
 pub mod types;
+pub mod websocket;
+pub mod crypto;
+pub mod blockchain;
+pub mod blockchain_engine;
+pub mod handlers;

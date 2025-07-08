@@ -15,6 +15,7 @@ pub mod state_management;
 pub mod oracle;
 pub mod events;
 pub mod examples;
+pub mod wallet;
 
 // Public API exports (only working functionality)
 pub use core::commands::AuthCommand;

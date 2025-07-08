@@ -3,25 +3,19 @@ use futures_util::{sink::SinkExt, stream::StreamExt};
 use log::info;
 use std::sync::Arc;
 use tokio::sync::broadcast;
-
-// This struct will hold the shared state for the WebSocket server
-// For now, we'll use a simple broadcast channel for episode updates.
-#[derive(Clone)]
-pub struct HttpServerState {
-    pub episode_updates: broadcast::Sender<String>,
-    pub keypair: secp256k1::Keypair,
-}
+use serde_json;
+use crate::api::http::state::ServerState;
 
 pub async fn websocket_handler(
     ws: WebSocketUpgrade,
-    State(state): State<HttpServerState>,
+    State(state): State<ServerState>,
 ) -> impl IntoResponse {
     ws.on_upgrade(|socket| handle_socket(socket, state))
 }
 
-async fn handle_socket(socket: WebSocket, state: HttpServerState) {
+async fn handle_socket(socket: WebSocket, state: ServerState) {
     info!("New WebSocket connection established.");
-    let mut rx = state.episode_updates.subscribe();
+    let mut rx = state.websocket_tx.subscribe();
 
     // Split the socket into sender and receiver
     let (mut sender, mut receiver) = socket.split();
@@ -29,7 +23,8 @@ async fn handle_socket(socket: WebSocket, state: HttpServerState) {
     // Task for sending messages to the client
     let mut send_task = tokio::spawn(async move {
         while let Ok(msg) = rx.recv().await {
-            if sender.send(Message::Text(msg.into())).await.is_err() {
+            let json_msg = serde_json::to_string(&msg).unwrap_or_else(|_| "{}".to_string());
+            if sender.send(Message::Text(json_msg.into())).await.is_err() {
                 // Client disconnected
                 break;
             }

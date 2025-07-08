@@ -4,3 +4,6 @@ pub mod client;
 pub mod authenticate;
 pub mod demo;
 pub mod http_server;
+pub mod list_endpoints;
+pub mod test_api_flow;
+pub mod test_api;

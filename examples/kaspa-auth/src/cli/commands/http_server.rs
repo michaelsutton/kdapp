@@ -14,14 +14,8 @@ pub struct HttpServerCommand {
 
 impl HttpServerCommand {
     pub async fn execute(self) -> Result<(), Box<dyn Error>> {
-        let keypair = if let Some(key_hex) = self.key {
-            parse_private_key(&key_hex)?
-        } else {
-            generate_random_keypair()
-        };
-        
-        log::info!("🔑 HTTP Server public key: {}", hex::encode(keypair.public_key().serialize()));
-        run_http_server(keypair, self.port).await
+        let provided_private_key = self.key.as_deref();
+        run_http_server(provided_private_key, self.port).await
     }
 }
 
@@ -34,10 +28,3 @@ fn parse_private_key(hex_str: &str) -> Result<Keypair, Box<dyn Error>> {
     Ok(Keypair::from_secret_key(&secp, &secret_key))
 }
 
-fn generate_random_keypair() -> Keypair {
-    use secp256k1::{Secp256k1, SecretKey};
-    
-    let secp = Secp256k1::new();
-    let secret_key = SecretKey::new(&mut rand::thread_rng());
-    Keypair::from_secret_key(&secp, &secret_key)
-}
