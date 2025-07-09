@@ -194,8 +194,8 @@ cargo run -- http-peer --port 8080
 # Click "Start Authentication Flow"
 # Should see REAL blockchain transactions on explorer!
 
-# Terminal 3: Test via CLI (should see same episodes)
-cargo run -- authenticate --peer http://127.0.0.1:8080
+# Terminal 3: Test via CLI pure kdapp (blockchain-only)
+cargo run -- authenticate
 ```
 
 #### Step 3.2: Verify on Kaspa Explorer

@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         )
         .subcommand(
             Command::new("authenticate")
-                .about("🚀 One-command kdapp authentication (UNIFIED ARCHITECTURE)")
+                .about("🚀 One-command kdapp authentication (PURE BLOCKCHAIN)")
                 .arg(
                     Arg::new("key")
                         .short('k')
@@ -210,7 +210,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 wallet.keypair
             };
             
-            println!("🚀 Starting kdapp authentication (unified architecture)");
+            println!("🚀 Starting pure kdapp authentication (blockchain-only)");
+            println!("⚡ No HTTP coordination - pure peer-to-peer via Kaspa blockchain");
             run_automatic_authentication(keypair).await?;
         }
         Some(("demo", _)) => {
@@ -629,12 +630,14 @@ async fn run_client_authentication(kaspa_signer: Keypair, auth_signer: Keypair) 
     
     impl EpisodeEventHandler<SimpleAuth> for ClientAuthHandler {
         fn on_initialize(&self, episode_id: kdapp::episode::EpisodeId, episode: &SimpleAuth) {
+            println!("🔍 CLIENT: Episode {} initialized - challenge: {:?}", episode_id, episode.challenge);
             let _ = self.sender.send((episode_id, episode.clone()));
         }
         
         fn on_command(&self, episode_id: kdapp::episode::EpisodeId, episode: &SimpleAuth, 
-                      _cmd: &AuthCommand, _authorization: Option<kdapp::pki::PubKey>, 
+                      cmd: &AuthCommand, _authorization: Option<kdapp::pki::PubKey>, 
                       _metadata: &kdapp::episode::PayloadMetadata) {
+            println!("🔍 CLIENT: Episode {} command {:?} - challenge: {:?}", episode_id, cmd, episode.challenge);
             let _ = self.sender.send((episode_id, episode.clone()));
         }
         
@@ -703,6 +706,9 @@ async fn run_client_authentication(kaspa_signer: Keypair, auth_signer: Keypair) 
     
     // Step 3: Sign challenge and send SubmitResponse command to blockchain
     println!("✍️ Signing challenge...");
+    println!("⏳ Waiting 2 seconds for DAG to settle before submitting response...");
+    tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
+    
     let msg = to_message(&challenge);
     let signature = sign_message(&auth_signer.secret_key(), &msg);
     let signature_hex = hex::encode(signature.0.serialize_der());

@@ -43,14 +43,14 @@ A **revolutionary peer-to-peer authentication system** built on the Kaspa blockc
    - Complete challenge-response authentication
    - Watch real-time blockchain confirmations!
 
-### 💻 CLI Interface (Advanced)
+### 💻 CLI Interface (Pure kdapp)
 
 ```bash
-# Start participant authentication
-cargo run --bin kaspa-auth -- authenticate --peer http://localhost:8080
+# Start pure kdapp authentication (no HTTP coordination)
+cargo run --bin kaspa-auth -- authenticate
 
 # Fund the displayed address at https://faucet.kaspanet.io/
-# Authentication completes automatically after funding
+# Authentication happens purely via Kaspa blockchain transactions
 ```
 
 ## 🏗️ Architecture Deep Dive
