@@ -1,6 +1,6 @@
 # 🔐 Kaspa Authentication - True Peer-to-Peer Authentication on Blockchain
 
-A **revolutionary peer-to-peer authentication system** built on the Kaspa blockchain using the kdapp framework. This is not just another authentication service - it's a **true P2P protocol** where participants control their own authentication without central authority.
+A **hybrid peer-to-peer authentication system** built on the Kaspa blockchain using the kdapp framework. This combines the security of blockchain transactions with the reliability of HTTP coordination - a **practical P2P protocol** where participants control their own authentication.
 
 ## 🌟 What Makes This Special
 
@@ -43,14 +43,17 @@ A **revolutionary peer-to-peer authentication system** built on the Kaspa blockc
    - Complete challenge-response authentication
    - Watch real-time blockchain confirmations!
 
-### 💻 CLI Interface (Pure kdapp)
+### 💻 CLI Interface (Hybrid P2P)
 
 ```bash
-# Start pure kdapp authentication (no HTTP coordination)
-cargo run --bin kaspa-auth -- authenticate
+# Start hybrid authentication (kdapp + HTTP coordination)
+cargo run --bin kaspa-auth -- authenticate --peer http://localhost:8080
+
+# Or use pure kdapp mode (experimental)
+cargo run --bin kaspa-auth -- authenticate --pure-kdapp
 
 # Fund the displayed address at https://faucet.kaspanet.io/
-# Authentication happens purely via Kaspa blockchain transactions
+# Authentication uses blockchain transactions + HTTP coordination
 ```
 
 ## 🏗️ Architecture Deep Dive

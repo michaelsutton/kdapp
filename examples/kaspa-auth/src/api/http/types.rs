@@ -26,6 +26,8 @@ pub struct ChallengeRequest {
 pub struct ChallengeResponse {
     pub episode_id: u64,
     pub nonce: String,
+    pub transaction_id: Option<String>,
+    pub status: String,
 }
 
 #[derive(Deserialize)]
@@ -40,6 +42,7 @@ pub struct VerifyResponse {
     pub episode_id: u64,
     pub authenticated: bool,
     pub status: String,
+    pub transaction_id: Option<String>,
 }
 
 #[derive(Serialize)]

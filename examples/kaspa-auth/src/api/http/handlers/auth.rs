@@ -65,13 +65,6 @@ pub async fn start_auth(
         &participant_wallet.keypair.x_only_public_key().0.serialize()
     );
     
-    // 🚨 CRITICAL: Create participant's transaction generator for proper signing
-    let participant_generator = TransactionGenerator::new(
-        participant_wallet.keypair,
-        crate::episode_runner::AUTH_PATTERN,
-        crate::episode_runner::AUTH_PREFIX,
-    );
-    
     // Create NewEpisode message for blockchain
     let new_episode = EpisodeMessage::<SimpleAuth>::NewEpisode { 
         episode_id, 
@@ -107,54 +100,36 @@ pub async fn start_auth(
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     };
     
-    // Create CLIENT transaction generator (not server's!)
-    let client_wallet = crate::wallet::get_wallet_for_command("web-client", None)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let network = kaspa_consensus_core::network::NetworkId::with_suffix(kaspa_consensus_core::network::NetworkType::Testnet, 10);
-    let client_generator = crate::episode_runner::create_auth_generator(client_wallet.keypair, network);
-    
-    // Build the blockchain transaction with CLIENT'S keys
-    println!("🔨 Building transaction with client's keys...");
-    let tx = match std::panic::catch_unwind(|| {
-        participant_generator.build_command_transaction(
-            utxo, 
-            &participant_funding_addr,
-            &new_episode, 
-            5000
-        )
-    }) {
-        Ok(tx) => tx,
-        Err(_) => {
-            println!("❌ Transaction building failed (panicked)");
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
-        }
-    };
-    
-    let transaction_id = tx.id().to_string();
-    println!("📋 Created transaction: {}", transaction_id);
     println!("🎯 Episode ID: {}", episode_id);
     println!("👤 Participant PubKey: {}", participant_pubkey);
     
-    // ✅ Submit transaction to blockchain (exactly like CLI)
-    println!("📤 Submitting transaction to Kaspa blockchain...");
-    let submission_result = match state.kaspad_client.as_ref().unwrap().submit_transaction(tx.as_ref().into(), false).await {
-        Ok(_response) => {
-            println!("✅ Transaction submitted successfully to blockchain!");
+    // ✅ Submit transaction to blockchain via AuthHttpPeer (centralized submission)
+    println!("📤 Submitting transaction to Kaspa blockchain via AuthHttpPeer...");
+    let submission_result = match state.auth_http_peer.as_ref().unwrap().submit_episode_message_transaction(
+        new_episode,
+        participant_wallet.keypair,
+        participant_funding_addr.clone(),
+        utxo,
+    ).await {
+        Ok(tx_id) => {
+            println!("✅ Transaction {} submitted successfully to blockchain via AuthHttpPeer!", tx_id);
             println!("🎬 Episode {} initialized on blockchain", episode_id);
-            "submitted_to_blockchain"
+            (tx_id, "submitted_to_blockchain".to_string())
         }
         Err(e) => {
-            println!("❌ Transaction submission failed: {}", e);
+            println!("❌ Transaction submission failed via AuthHttpPeer: {}", e);
             println!("💡 Make sure participant wallet is funded: {}", participant_funding_addr);
-            "transaction_submission_failed"
+            ("error".to_string(), "transaction_submission_failed".to_string())
         }
     };
+    
+    let (transaction_id, status) = submission_result;
     
     Ok(Json(AuthResponse {
         episode_id: episode_id.into(),
         organizer_public_key: hex::encode(state.peer_keypair.public_key().serialize()),
         participant_kaspa_address: participant_addr.to_string(),
         transaction_id: Some(transaction_id),
-        status: submission_result.to_string(),
+        status: status,
     }))
 }

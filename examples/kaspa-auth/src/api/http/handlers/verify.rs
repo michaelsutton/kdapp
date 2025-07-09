@@ -71,15 +71,7 @@ pub async fn verify_auth(
         &participant_wallet.keypair.x_only_public_key().0.serialize()
     );
     
-    // 🚨 CRITICAL: Create participant's transaction generator for proper signing
-    let participant_generator = TransactionGenerator::new(
-        participant_wallet.keypair,
-        crate::episode_runner::AUTH_PATTERN,
-        crate::episode_runner::AUTH_PREFIX,
-    );
-    
     // Get REAL UTXOs from blockchain (exactly like CLI)
-    // Wait for previous transaction to confirm before fetching new UTXOs
     let utxo = if let Some(ref kaspad) = state.kaspad_client {
         println!("🔍 Fetching UTXOs for SubmitResponse transaction...");
         
@@ -134,25 +126,31 @@ pub async fn verify_auth(
         participant_pubkey // Use participant's public key for episode authorization
     );
     
-    // Build and submit transaction to blockchain (exactly like CLI)
-    let tx = participant_generator.build_command_transaction(utxo, &participant_addr, &step, 5000);
-    println!("🚀 Submitting SubmitResponse transaction: {}", tx.id());
-    
-    let submission_result = match state.kaspad_client.as_ref().unwrap().submit_transaction(tx.as_ref().into(), false).await {
-        Ok(_response) => {
-            println!("✅ SubmitResponse transaction submitted to blockchain!");
+    // Submit transaction to blockchain via AuthHttpPeer (centralized submission)
+    println!("📤 Submitting SubmitResponse transaction to Kaspa blockchain via AuthHttpPeer...");
+    let submission_result = match state.auth_http_peer.as_ref().unwrap().submit_episode_message_transaction(
+        step,
+        participant_wallet.keypair,
+        participant_addr.clone(),
+        utxo,
+    ).await {
+        Ok(tx_id) => {
+            println!("✅ SubmitResponse transaction {} submitted successfully to blockchain via AuthHttpPeer!", tx_id);
             println!("📊 Transactions are now being processed by auth organizer peer's kdapp engine");
-            "submit_response_submitted"
+            (tx_id, "submit_response_submitted".to_string())
         }
         Err(e) => {
-            println!("❌ SubmitResponse submission failed: {}", e);
-            "submit_response_failed"
+            println!("❌ SubmitResponse submission failed via AuthHttpPeer: {}", e);
+            ("error".to_string(), "submit_response_failed".to_string())
         }
     };
+    
+    let (transaction_id, status) = submission_result;
     
     Ok(Json(VerifyResponse {
         episode_id,
         authenticated: false, // Will be updated by blockchain when processed
-        status: submission_result.to_string(),
+        status,
+        transaction_id: Some(transaction_id),
     }))
 }

@@ -15,8 +15,10 @@ use crate::core::episode::SimpleAuth;
 use crate::core::commands::AuthCommand;
 use crate::api::http::state::{PeerState, WebSocketMessage, SharedEpisodeState};
 use crate::episode_runner::{AUTH_PREFIX, AUTH_PATTERN};
+use kaspa_wrpc_client::prelude::{RpcApi, KaspaRpcClient};
 
 /// The main HTTP coordination peer that runs a real kdapp engine
+#[derive(Clone)]
 pub struct AuthHttpPeer {
     pub peer_state: PeerState,
     pub network: NetworkId,
@@ -52,22 +54,28 @@ impl AuthHttpPeer {
             }
         };
         
-        let peer_state = PeerState {
+        let mut peer_state = PeerState {
             episodes: Arc::new(std::sync::Mutex::new(HashMap::new())),  // Legacy
             blockchain_episodes: blockchain_episodes.clone(),  // NEW - real blockchain state
             websocket_tx,
             peer_keypair,
             transaction_generator,
             kaspad_client,  // NEW - for actual transaction submission
+            auth_http_peer: None, // Will be set after AuthHttpPeer is created
         };
         
         let exit_signal = Arc::new(AtomicBool::new(false));
         
-        Ok(AuthHttpPeer {
-            peer_state,
+        let auth_http_peer = AuthHttpPeer {
+            peer_state: peer_state.clone(),
             network,
             exit_signal,
-        })
+        };
+        
+        // Set the self reference after the struct is created
+        peer_state.auth_http_peer = Some(Arc::new(auth_http_peer.clone()));
+        
+        Ok(auth_http_peer)
     }
     
     /// Start the blockchain listener - this makes HTTP coordination peer a real kdapp node!
@@ -143,12 +151,43 @@ impl AuthHttpPeer {
         }
     }
     
-    /// Submit a transaction to the blockchain
-    pub async fn submit_transaction(&self, tx: &kaspa_consensus_core::tx::Transaction) -> Result<String, Box<dyn std::error::Error>> {
-        // TODO: Implement transaction submission via kdapp proxy pattern
-        // For now, just return the transaction ID
-        // In a real implementation, this would go through the kdapp submission flow
-        Ok(tx.id().to_string())
+    /// Submit an EpisodeMessage transaction to the blockchain
+    pub async fn submit_episode_message_transaction(
+        &self,
+        episode_message: kdapp::engine::EpisodeMessage<crate::core::episode::SimpleAuth>,
+        signer_keypair: secp256k1::Keypair,
+        funding_address: kaspa_addresses::Address,
+        utxo: (kaspa_consensus_core::tx::TransactionOutpoint, kaspa_consensus_core::tx::UtxoEntry),
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        let generator = kdapp::generator::TransactionGenerator::new(
+            signer_keypair,
+            crate::episode_runner::AUTH_PATTERN,
+            crate::episode_runner::AUTH_PREFIX,
+        );
+
+        let tx = generator.build_command_transaction(
+            utxo,
+            &funding_address,
+            &episode_message,
+            5000,
+        );
+
+        let transaction_id = tx.id().to_string();
+
+        if let Some(kaspad) = self.peer_state.kaspad_client.as_ref() {
+            match kaspad.submit_transaction(tx.as_ref().into(), false).await {
+                Ok(_) => {
+                    println!("✅ Transaction {} submitted to blockchain via AuthHttpPeer", transaction_id);
+                    Ok(transaction_id)
+                }
+                Err(e) => {
+                    println!("❌ Transaction {} submission failed: {}", transaction_id, e);
+                    Err(e.into())
+                }
+            }
+        } else {
+            Err("Kaspad client not available for transaction submission.".into())
+        }
     }
 }
 

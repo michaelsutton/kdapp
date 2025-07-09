@@ -49,13 +49,6 @@ pub async fn request_challenge(
         &participant_wallet.keypair.x_only_public_key().0.serialize()
     );
     
-    // 🚨 CRITICAL: Create participant's transaction generator for proper signing
-    let participant_generator = TransactionGenerator::new(
-        participant_wallet.keypair,
-        crate::episode_runner::AUTH_PATTERN,
-        crate::episode_runner::AUTH_PREFIX,
-    );
-    
     // Get REAL UTXOs from blockchain (exactly like CLI)
     // Wait for previous transaction to confirm before fetching new UTXOs
     let utxo = if let Some(ref kaspad) = state.kaspad_client {
@@ -100,24 +93,38 @@ pub async fn request_challenge(
         participant_pubkey
     );
     
-    // Build and submit transaction to blockchain (exactly like CLI)
-    let tx = participant_generator.build_command_transaction(utxo, &participant_addr, &step, 5000);
-    println!("🚀 Submitting RequestChallenge transaction: {}", tx.id());
-    
-    let _submission_result = match state.kaspad_client.as_ref().unwrap().submit_transaction(tx.as_ref().into(), false).await {
-        Ok(_response) => {
-            println!("✅ RequestChallenge transaction submitted to blockchain!");
+    // Submit transaction to blockchain via AuthHttpPeer (centralized submission)
+    println!("📤 Submitting RequestChallenge transaction to Kaspa blockchain via AuthHttpPeer...");
+    let submission_result = match state.auth_http_peer.as_ref().unwrap().submit_episode_message_transaction(
+        step,
+        participant_wallet.keypair,
+        participant_addr.clone(),
+        utxo,
+    ).await {
+        Ok(tx_id) => {
+            println!("✅ RequestChallenge transaction {} submitted successfully to blockchain via AuthHttpPeer!", tx_id);
             println!("⏳ Organizer peer will generate challenge and update episode on blockchain");
-            "request_challenge_submitted"
+            (tx_id, "request_challenge_submitted".to_string())
         }
         Err(e) => {
-            println!("❌ RequestChallenge submission failed: {}", e);
-            "request_challenge_failed"
+            println!("❌ RequestChallenge submission failed via AuthHttpPeer: {}", e);
+            ("error".to_string(), "request_challenge_failed".to_string())
         }
     };
     
+    let (transaction_id, status) = submission_result;
+
+    let mut challenge_nonce = String::new();
+    if let Some(episode) = state.blockchain_episodes.lock().unwrap().get(&req.episode_id.try_into().unwrap()) {
+        if let Some(challenge) = &episode.challenge {
+            challenge_nonce = challenge.clone();
+        }
+    }
+
     Ok(Json(ChallengeResponse {
         episode_id: req.episode_id,
-        nonce: String::new(), // Will come from blockchain when processed
+        nonce: challenge_nonce,
+        transaction_id: Some(transaction_id),
+        status: status,
     }))
 }

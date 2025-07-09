@@ -188,7 +188,15 @@ pub async fn run_http_peer(provided_private_key: Option<&str>, port: u16) -> Res
     
     // Create the AuthHttpPeer with kdapp engine
     let auth_peer = Arc::new(AuthHttpPeer::new(keypair, websocket_tx.clone()).await?);
-    let peer_state = auth_peer.peer_state.clone();
+    let peer_state = PeerState {
+        episodes: auth_peer.peer_state.episodes.clone(),
+        blockchain_episodes: auth_peer.peer_state.blockchain_episodes.clone(),
+        websocket_tx: auth_peer.peer_state.websocket_tx.clone(),
+        peer_keypair: auth_peer.peer_state.peer_keypair,
+        transaction_generator: auth_peer.peer_state.transaction_generator.clone(),
+        kaspad_client: auth_peer.peer_state.kaspad_client.clone(),
+        auth_http_peer: Some(auth_peer.clone()), // Pass the Arc<AuthHttpPeer> here
+    };
     
     let cors = CorsLayer::new()
         .allow_origin(Any)

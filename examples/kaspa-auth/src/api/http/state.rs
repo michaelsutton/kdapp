@@ -25,6 +25,7 @@ pub struct PeerState {
     pub peer_keypair: Keypair,
     pub transaction_generator: Arc<TransactionGenerator>,
     pub kaspad_client: Option<Arc<KaspaRpcClient>>,  // NEW - for transaction submission
+    pub auth_http_peer: Option<Arc<crate::api::http::blockchain_engine::AuthHttpPeer>>, // Reference to the main peer
 }
 
 // WebSocket message for real-time blockchain updates

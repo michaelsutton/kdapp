@@ -4,6 +4,8 @@ use std::error::Error;
 use secp256k1::{Secp256k1, SecretKey, Keypair};
 use log::info;
 use kaspa_addresses;
+use serde_json;
+use reqwest;
 
 use kaspa_auth::core::episode::SimpleAuth;
 use kaspa_auth::core::commands::AuthCommand;
@@ -58,7 +60,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         )
         .subcommand(
             Command::new("authenticate")
-                .about("🚀 One-command kdapp authentication (PURE BLOCKCHAIN)")
+                .about("🚀 One-command authentication (kdapp + HTTP coordination)")
                 .arg(
                     Arg::new("key")
                         .short('k')
@@ -72,6 +74,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         .long("keyfile")
                         .value_name("FILE")
                         .help("Load private key from file (safer than --key)")
+                )
+                .arg(
+                    Arg::new("peer")
+                        .short('p')
+                        .long("peer")
+                        .value_name("URL")
+                        .help("HTTP organizer peer URL for coordination")
+                        .default_value("http://127.0.0.1:8080")
+                )
+                .arg(
+                    Arg::new("pure-kdapp")
+                        .long("pure-kdapp")
+                        .help("Use pure kdapp without HTTP coordination (experimental)")
+                        .action(clap::ArgAction::SetTrue)
                 )
         )
         .subcommand(
@@ -201,18 +217,32 @@ async fn main() -> Result<(), Box<dyn Error>> {
             run_http_peer(provided_private_key, port).await?;
         }
         Some(("authenticate", sub_matches)) => {
+            let peer_url = sub_matches.get_one::<String>("peer").unwrap().clone();
+            let use_pure_kdapp = sub_matches.get_flag("pure-kdapp");
+            
             // Get private key using unified wallet system
-            let keypair = if let Some(keyfile_path) = sub_matches.get_one::<String>("keyfile") {
+            let auth_keypair = if let Some(keyfile_path) = sub_matches.get_one::<String>("keyfile") {
                 load_private_key_from_file(keyfile_path)?
             } else {
                 let provided_private_key = sub_matches.get_one::<String>("key").map(|s| s.as_str());
                 let wallet = get_wallet_for_command("authenticate", provided_private_key)?;
                 wallet.keypair
             };
+
+            // Get funding keypair for transactions
+            let funding_wallet = get_wallet_for_command("participant-peer", None)?;
+            let funding_keypair = funding_wallet.keypair;
             
-            println!("🚀 Starting pure kdapp authentication (blockchain-only)");
-            println!("⚡ No HTTP coordination - pure peer-to-peer via Kaspa blockchain");
-            run_automatic_authentication(keypair).await?;
+            if use_pure_kdapp {
+                println!("🚀 Starting pure kdapp authentication (experimental)");
+                println!("⚡ No HTTP coordination - pure peer-to-peer via Kaspa blockchain");
+                run_automatic_authentication(auth_keypair).await?;
+            } else {
+                println!("🚀 Starting hybrid authentication (kdapp + HTTP coordination)");
+                println!("🎯 Organizer peer: {}", peer_url);
+                println!("💡 Use --pure-kdapp for experimental blockchain-only mode");
+                run_http_coordinated_authentication(funding_keypair, auth_keypair, peer_url).await?;
+            }
         }
         Some(("demo", _)) => {
             run_interactive_demo()?;
@@ -547,6 +577,206 @@ async fn run_client_authentication(kaspa_signer: Keypair, auth_signer: Keypair) 
     use rand::Rng;
     
     let client_pubkey = kdapp::pki::PubKey(auth_signer.public_key());
+    
+    // Connect to Kaspa network (real blockchain!)
+    let network = NetworkId::with_suffix(kaspa_consensus_core::network::NetworkType::Testnet, 10);
+    
+    let kaspad = connect_client(network, None).await?;
+    
+    // Create Kaspa address for funding transactions
+    let kaspa_addr = Address::new(Prefix::Testnet, Version::PubKey, &kaspa_signer.x_only_public_key().0.serialize());
+    
+    // Get UTXOs for transaction funding
+    let entries = kaspad.get_utxos_by_addresses(vec![kaspa_addr.clone()]).await?;
+    
+    if entries.is_empty() {
+        return Err("No UTXOs found! Please fund the Kaspa address first.".into());
+    }
+    
+    let mut utxo = entries.first().map(|entry| {
+        (TransactionOutpoint::from(entry.outpoint.clone()), UtxoEntry::from(entry.utxo_entry.clone()))
+    }).unwrap();
+    
+    // Create real transaction generator (kdapp architecture!)
+    let generator = TransactionGenerator::new(kaspa_signer, AUTH_PATTERN, AUTH_PREFIX);
+    
+    // Step 1: Initialize the episode first (like tictactoe example)
+    let episode_id = rand::thread_rng().gen();
+    let new_episode = EpisodeMessage::<SimpleAuth>::NewEpisode { 
+        episode_id, 
+        participants: vec![client_pubkey] 
+    };
+    
+    let tx = generator.build_command_transaction(utxo, &kaspa_addr, &new_episode, 5000);
+    
+    let _res = kaspad.submit_transaction(tx.as_ref().into(), false).await?;
+    utxo = generator::get_first_output_utxo(&tx);
+    
+    // Step 2: Send RequestChallenge command to blockchain
+    let auth_command = AuthCommand::RequestChallenge;
+    let step = EpisodeMessage::<SimpleAuth>::new_signed_command(
+        episode_id, 
+        auth_command, 
+        auth_signer.secret_key(), 
+        client_pubkey
+    );
+    
+    let tx = generator.build_command_transaction(utxo, &kaspa_addr, &step, 5000);
+    
+    let _res = kaspad.submit_transaction(tx.as_ref().into(), false).await?;
+    utxo = generator::get_first_output_utxo(&tx);
+    
+    // Set up episode state listener (like tictactoe example)
+    use std::sync::{mpsc::channel, Arc, atomic::AtomicBool};
+    use tokio::sync::mpsc::UnboundedSender;
+    use kdapp::{engine::{self}, episode::EpisodeEventHandler};
+    use kaspa_auth::core::episode::SimpleAuth;
+    
+    let (sender, receiver) = channel();
+    let (response_sender, mut response_receiver) = tokio::sync::mpsc::unbounded_channel();
+    let exit_signal = Arc::new(AtomicBool::new(false));
+    
+    // Simple event handler to capture episode state
+    struct ClientAuthHandler {
+        sender: UnboundedSender<(kdapp::episode::EpisodeId, SimpleAuth)>,
+    }
+    
+    impl EpisodeEventHandler<SimpleAuth> for ClientAuthHandler {
+        fn on_initialize(&self, episode_id: kdapp::episode::EpisodeId, episode: &SimpleAuth) {
+            let _ = self.sender.send((episode_id, episode.clone()));
+        }
+        
+        fn on_command(&self, episode_id: kdapp::episode::EpisodeId, episode: &SimpleAuth, 
+                      _cmd: &AuthCommand, _authorization: Option<kdapp::pki::PubKey>, 
+                      _metadata: &kdapp::episode::PayloadMetadata) {
+            let _ = self.sender.send((episode_id, episode.clone()));
+        }
+        
+        fn on_rollback(&self, _episode_id: kdapp::episode::EpisodeId, _episode: &SimpleAuth) {}
+    }
+    
+    // Start a simple engine to listen for episode updates
+    let mut engine = engine::Engine::<SimpleAuth, ClientAuthHandler>::new(receiver);
+    let handler = ClientAuthHandler { sender: response_sender };
+    
+    let engine_task = tokio::task::spawn_blocking(move || {
+        engine.start(vec![handler]);
+    });
+    
+    // Connect client proxy to listen for episode updates
+    let client_kaspad = connect_client(network, None).await?;
+    let engines = std::iter::once((AUTH_PREFIX, (AUTH_PATTERN, sender))).collect();
+    
+    let exit_signal_clone = exit_signal.clone();
+    tokio::spawn(async move {
+        kdapp::proxy::run_listener(client_kaspad, engines, exit_signal_clone).await;
+    });
+    
+    // Wait for challenge to be generated by server
+    let mut challenge = String::new();
+    let mut attempt_count = 0;
+    let max_attempts = 100; // 10 second timeout - Pure kdapp architecture (100 blocks = 10 seconds)
+    
+    // Wait for episode state with challenge
+    'outer: loop {
+        attempt_count += 1;
+        
+        if let Ok((received_episode_id, episode_state)) = response_receiver.try_recv() {
+            if received_episode_id == episode_id {
+                if let Some(server_challenge) = &episode_state.challenge {
+                    challenge = server_challenge.clone();
+                    break;
+                }
+            }
+        }
+        
+        if attempt_count >= max_attempts {
+            return Err("PURE KDAPP AUTHENTICATION FAILED: Blockchain timeout after 10 seconds (100 blocks). No HTTP fallback - this is pure kdapp architecture.".into());
+        }
+        
+        // Add timeout to prevent infinite waiting
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    }
+    
+    // Stop listening after we get the challenge
+    exit_signal.store(true, std::sync::atomic::Ordering::Relaxed);
+    
+    // Step 3: Sign challenge and send SubmitResponse command to blockchain
+    let msg = to_message(&challenge);
+    let signature = sign_message(&auth_signer.secret_key(), &msg);
+    let signature_hex = hex::encode(signature.0.serialize_der());
+    
+    let auth_command = AuthCommand::SubmitResponse {
+        signature: signature_hex,
+        nonce: challenge,
+    };
+    
+    let step = EpisodeMessage::<SimpleAuth>::new_signed_command(
+        episode_id, 
+        auth_command, 
+        auth_signer.secret_key(), 
+        client_pubkey
+    );
+    
+    let tx = generator.build_command_transaction(utxo, &kaspa_addr, &step, 5000);
+    
+    let _res = kaspad.submit_transaction(tx.as_ref().into(), false).await?;
+    
+    Ok(())
+}
+
+/// 🚀 Automatic authentication - uses REAL kdapp architecture (unified with participant-peer --auth)
+async fn run_automatic_authentication(keypair: Keypair) -> Result<(), Box<dyn Error>> {
+    println!("🎯 Starting kdapp-based authentication (unified architecture)");
+    println!("📱 This uses the same kdapp engine as participant-peer --auth");
+    println!("🔑 Using public key: {}", hex::encode(keypair.public_key().serialize()));
+    println!();
+
+    // Use the same wallet system as participant-peer for consistency
+    let wallet = get_wallet_for_command("participant-peer", None)?;
+    
+    // Use the wallet's keypair for funding transactions (participant pays)
+    let funding_keypair = wallet.keypair;
+    let auth_keypair = keypair; // Use provided keypair for authentication
+    
+    println!("💰 Funding transactions with participant wallet: {}", wallet.get_kaspa_address());
+    println!("🔐 Authentication keypair: {}", hex::encode(auth_keypair.public_key().serialize()));
+    
+    // Check if wallet needs funding
+    if wallet.check_funding_status() {
+        println!("⚠️  WARNING: Participant wallet may need funding for blockchain transactions!");
+        println!("💡 Get testnet funds: https://faucet.kaspanet.io/");
+        println!("💰 Fund address: {}", wallet.get_kaspa_address());
+        println!();
+    }
+    
+    // Use the REAL kdapp architecture - same as participant-peer --auth
+    run_client_authentication(funding_keypair, auth_keypair).await?;
+    
+    println!("✅ kdapp authentication completed successfully!");
+    println!("🔍 Check your transactions on Kaspa explorer: https://explorer-tn10.kaspa.org/");
+    println!("📊 Look for AUTH transactions (0x41555448) from your address: {}", wallet.get_kaspa_address());
+    
+    Ok(())
+}
+
+/// 🚀 HTTP Coordinated authentication - hybrid kdapp + HTTP coordination  
+/// This function attempts to use pure kdapp authentication first, and falls back to HTTP coordination
+/// for challenge retrieval if the blockchain-based challenge retrieval times out.
+async fn run_http_coordinated_authentication(kaspa_signer: Keypair, auth_signer: Keypair, peer_url: String) -> Result<(), Box<dyn Error>> {
+    use kdapp::{
+        engine::EpisodeMessage,
+        generator::{self, TransactionGenerator},
+        proxy::connect_client,
+    };
+    use kaspa_addresses::{Address, Prefix, Version};
+    use kaspa_consensus_core::{network::NetworkId, tx::{TransactionOutpoint, UtxoEntry}};
+    use kaspa_wrpc_client::prelude::*;
+    use kaspa_rpc_core::api::rpc::RpcApi;
+    use kaspa_auth::episode_runner::{AUTH_PATTERN, AUTH_PREFIX};
+    use rand::Rng;
+    
+    let client_pubkey = kdapp::pki::PubKey(auth_signer.public_key());
     println!("🔑 Auth public key: {}", client_pubkey);
     
     // Connect to Kaspa network (real blockchain!)
@@ -666,10 +896,10 @@ async fn run_client_authentication(kaspa_signer: Keypair, auth_signer: Keypair) 
     println!("🔍 Looking for episode ID: {}", episode_id);
     let mut challenge = String::new();
     let mut attempt_count = 0;
-    let max_attempts = 100; // 10 second timeout - Pure kdapp architecture (100 blocks = 10 seconds)
+    let max_attempts = 20; // 2 second timeout - Hybrid mode with HTTP fallback
     
-    // Wait for episode state with challenge
-    'outer: loop {
+    // Try to get challenge from blockchain first
+    'blockchain_loop: loop {
         attempt_count += 1;
         
         if let Ok((received_episode_id, episode_state)) = response_receiver.try_recv() {
@@ -678,7 +908,7 @@ async fn run_client_authentication(kaspa_signer: Keypair, auth_signer: Keypair) 
                 if let Some(server_challenge) = &episode_state.challenge {
                     challenge = server_challenge.clone();
                     println!("🎲 Real challenge received from server: {}", challenge);
-                    break;
+                    break 'blockchain_loop;
                 } else {
                     println!("📡 Episode state update received, but no challenge yet. Auth status: {}", episode_state.is_authenticated);
                 }
@@ -687,14 +917,87 @@ async fn run_client_authentication(kaspa_signer: Keypair, auth_signer: Keypair) 
             }
         }
         
-        if attempt_count % 25 == 0 {
+        if attempt_count % 10 == 0 {
             println!("⏰ Still listening... attempt {} of {}", attempt_count, max_attempts);
         }
         
         if attempt_count >= max_attempts {
-            println!("❌ PURE KDAPP TIMEOUT: Blockchain authentication failed after {} attempts", max_attempts);
-            println!("⚡ Expected: 0.1s blocks × 100 attempts = 10 seconds maximum");
-            return Err("❌ PURE KDAPP AUTHENTICATION FAILED: Blockchain timeout after 10 seconds (100 blocks). No HTTP fallback - this is pure kdapp architecture.".into());
+            println!("⚠️ Timeout waiting for challenge from blockchain. Falling back to HTTP coordination...");
+            
+            // HTTP coordination fallback (working version)
+            let client = reqwest::Client::new();
+            let public_key_hex = hex::encode(client_pubkey.0.serialize());
+            
+            println!("📝 Registering episode {} with HTTP organizer...", episode_id);
+            
+            // Try to register the episode with HTTP server
+            let register_url = format!("{}/auth/register-episode", peer_url);
+            let register_response = client
+                .post(&register_url)
+                .header("Content-Type", "application/json")
+                .json(&serde_json::json!({
+                    "episode_id": episode_id,
+                    "public_key": public_key_hex
+                }))
+                .send()
+                .await;
+            
+            if register_response.is_ok() {
+                println!("✅ Episode registered with HTTP organizer");
+            } else {
+                println!("⚠️ Could not register episode, trying legacy endpoint...");
+            }
+            
+            // Get challenge via HTTP (working version with both endpoints)
+            for retry_attempt in 1..=5 {
+                println!("🔄 HTTP coordination attempt {} of 5...", retry_attempt);
+                
+                // Try both the new status endpoint and legacy challenge endpoint
+                let status_url = format!("{}/auth/status/{}", peer_url, episode_id);
+                let challenge_url = format!("{}/challenge/{}", peer_url, episode_id);
+                
+                // First try the status endpoint
+                match client.get(&status_url).send().await {
+                    Ok(response) if response.status().is_success() => {
+                        if let Ok(status_json) = response.text().await {
+                            println!("📡 HTTP status response: {}", status_json);
+                            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&status_json) {
+                                if let Some(server_challenge) = parsed["challenge"].as_str() {
+                                    challenge = server_challenge.to_string();
+                                    println!("🎯 Challenge retrieved via HTTP status: {}", challenge);
+                                    break 'blockchain_loop;
+                                }
+                            }
+                        }
+                    }
+                    _ => {
+                        // If status fails, try legacy challenge endpoint
+                        match client.get(&challenge_url).send().await {
+                            Ok(response) if response.status().is_success() => {
+                                if let Ok(challenge_json) = response.text().await {
+                                    println!("📡 HTTP legacy response: {}", challenge_json);
+                                    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&challenge_json) {
+                                        if let Some(server_challenge) = parsed["challenge"].as_str() {
+                                            challenge = server_challenge.to_string();
+                                            println!("🎯 Challenge retrieved via HTTP legacy: {}", challenge);
+                                            break 'blockchain_loop;
+                                        }
+                                    }
+                                }
+                            }
+                            _ => {
+                                println!("❌ HTTP attempt {} failed", retry_attempt);
+                            }
+                        }
+                    }
+                }
+                
+                // Wait before retry
+                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            }
+            
+            // All attempts failed - exit with error
+            return Err("❌ HYBRID AUTHENTICATION FAILED: Could not retrieve challenge via blockchain or HTTP coordination. Please ensure the organizer peer is running and accessible.".into());
         }
         
         // Add timeout to prevent infinite waiting
@@ -706,8 +1009,7 @@ async fn run_client_authentication(kaspa_signer: Keypair, auth_signer: Keypair) 
     
     // Step 3: Sign challenge and send SubmitResponse command to blockchain
     println!("✍️ Signing challenge...");
-    println!("⏳ Waiting 2 seconds for DAG to settle before submitting response...");
-    tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
+    
     
     let msg = to_message(&challenge);
     let signature = sign_message(&auth_signer.secret_key(), &msg);
@@ -734,41 +1036,6 @@ async fn run_client_authentication(kaspa_signer: Keypair, auth_signer: Keypair) 
     println!("✅ Authentication commands submitted to Kaspa blockchain!");
     println!("🎯 Real kdapp architecture: Generator → Proxy → Engine → Episode");
     println!("📊 Transactions are now being processed by auth server's kdapp engine");
-    
-    Ok(())
-}
-
-/// 🚀 Automatic authentication - uses REAL kdapp architecture (unified with participant-peer --auth)
-async fn run_automatic_authentication(keypair: Keypair) -> Result<(), Box<dyn Error>> {
-    println!("🎯 Starting kdapp-based authentication (unified architecture)");
-    println!("📱 This uses the same kdapp engine as participant-peer --auth");
-    println!("🔑 Using public key: {}", hex::encode(keypair.public_key().serialize()));
-    println!();
-
-    // Use the same wallet system as participant-peer for consistency
-    let wallet = get_wallet_for_command("participant-peer", None)?;
-    
-    // Use the wallet's keypair for funding transactions (participant pays)
-    let funding_keypair = wallet.keypair;
-    let auth_keypair = keypair; // Use provided keypair for authentication
-    
-    println!("💰 Funding transactions with participant wallet: {}", wallet.get_kaspa_address());
-    println!("🔐 Authentication keypair: {}", hex::encode(auth_keypair.public_key().serialize()));
-    
-    // Check if wallet needs funding
-    if wallet.check_funding_status() {
-        println!("⚠️  WARNING: Participant wallet may need funding for blockchain transactions!");
-        println!("💡 Get testnet funds: https://faucet.kaspanet.io/");
-        println!("💰 Fund address: {}", wallet.get_kaspa_address());
-        println!();
-    }
-    
-    // Use the REAL kdapp architecture - same as participant-peer --auth
-    run_client_authentication(funding_keypair, auth_keypair).await?;
-    
-    println!("✅ kdapp authentication completed successfully!");
-    println!("🔍 Check your transactions on Kaspa explorer: https://explorer-tn10.kaspa.org/");
-    println!("📊 Look for AUTH transactions (0x41555448) from your address: {}", wallet.get_kaspa_address());
     
     Ok(())
 }
