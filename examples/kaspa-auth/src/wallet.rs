@@ -166,15 +166,18 @@ impl KaspaAuthWallet {
     
     /// Load wallet for specific command with appropriate messaging
     pub fn load_for_command(command: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        // Use separate wallet files for server vs client
+        // Use separate wallet files for organizer vs participant peers
         let wallet = match command {
-            "server" | "http-server" => Self::load_or_create_with_role("server")?,
-            "client" | "authenticate" => Self::load_or_create_with_role("client")?,
+            "organizer-peer" | "http-peer" => Self::load_or_create_with_role("organizer-peer")?,
+            "participant-peer" | "web-participant" | "authenticate" => Self::load_or_create_with_role("participant-peer")?,
+            // Legacy compatibility
+            "server" | "http-server" => Self::load_or_create_with_role("organizer-peer")?,
+            "client" => Self::load_or_create_with_role("participant-peer")?,
             _ => Self::load_or_create()?,
         };
         
         match command {
-            "server" | "http-server" => {
+            "organizer-peer" | "http-peer" | "server" | "http-server" => {
                 if wallet.was_created {
                     println!("🚀 Starting {} with new wallet", command);
                 } else {

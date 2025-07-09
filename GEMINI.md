@@ -1,5 +1,29 @@
 # Kaspa Auth - GEMINI CLI Development Guide
 
+## 🌐 FUNDAMENTAL: kdapp is Peer-to-Peer, NOT Client-Server
+
+### ❌ WRONG Hierarchical Thinking:
+- "Server" controls authentication
+- "Client" requests permission from server  
+- HTTP endpoints are the source of truth
+- Traditional client-server architecture
+
+### ✅ CORRECT Peer-to-Peer Reality:
+- **HTTP Organizer Peer**: Organizes episode coordination via HTTP interface
+- **Web Participant Peer**: Participant accessing via browser
+- **CLI Participant Peer**: Participant accessing via command line
+- **Blockchain**: The ONLY source of truth
+- **Episodes**: Shared state between equal peers
+
+### 🗣️ REQUIRED Terminology:
+- **"HTTP Organizer Peer"** (not "server")
+- **"Web Participant Peer"** (not "client")
+- **"Organizer Peer"** (role, not hierarchy)
+- **"Participant Peer"** (role, not hierarchy)
+- **"Peer Address"** (not "server address" or "client address")
+
+**Why This Matters**: When we use "server/client" language, we unconsciously default to hierarchical thinking patterns that are fundamentally wrong for kdapp architecture. This causes implementation bugs, security issues, and architectural confusion.
+
 ## 🤖 Gemini CLI Integration for kdapp Development
 
 This guide is specifically for developers using `gemini-cli` to work on the kaspa-auth example and other kdapp projects.
@@ -49,14 +73,14 @@ WARN: Command SubmitResponse rejected: invalid command: Invalid or expired chall
 ```
 
 **Because:**
-- Server generated: `auth_9170708824197651522`
-- Client used hardcoded: `auth_6955901221946388822`  
+- Organizer peer generated: `auth_9170708824197651522`
+- Participant peer used hardcoded: `auth_6955901221946388822`  
 - Authentication failed: challenge mismatch!
 
 **✅ CORRECT SOLUTION:**
 ```rust
 // Fail gracefully - no fake challenges allowed!
-return Err("❌ AUTHENTICATION FAILED: Could not retrieve challenge from server.".into());
+return Err("❌ AUTHENTICATION FAILED: Could not retrieve challenge from organizer peer.".into());
 ```
 
 ## 🎯 Gemini CLI Best Practices for kdapp Development
@@ -118,7 +142,7 @@ gemini -p "@examples/kaspa-auth/ @examples/tictactoe/ Do both examples use real 
 ### Pattern 2: Blockchain-Native Coordination
 ```bash
 # ✅ GOOD - Confirm the approach
-gemini -p "@src/ Is episode state the source of truth with HTTP only for coordination?"
+gemini -p "@src/ Is episode state the source of truth with HTTP only for peer coordination?"
 ```
 
 ### Pattern 3: Production Cryptography
@@ -156,7 +180,7 @@ gemini -p "@kdapp/ @examples/ I'm trying to implement [FEATURE] but it seems com
 
 ### When Tempted to Use HTTP APIs
 ```bash
-gemini -p "@examples/tictactoe/ How does tictactoe handle coordination between players? Should I use the same pattern for authentication?"
+gemini -p "@examples/tictactoe/ How does tictactoe handle coordination between peers? Should I use the same pattern for authentication?"
 ```
 
 ### When Authentication Fails

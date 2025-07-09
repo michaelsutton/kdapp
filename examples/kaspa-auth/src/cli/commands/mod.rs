@@ -1,9 +1,9 @@
 pub mod test;
-pub mod server;
-pub mod client;
+pub mod organizer_peer;
+pub mod participant_peer;
 pub mod authenticate;
 pub mod demo;
-pub mod http_server;
+pub mod http_organizer_peer;
 pub mod list_endpoints;
 pub mod test_api_flow;
 pub mod test_api;

@@ -2,12 +2,11 @@ use clap::Args;
 use reqwest::Client;
 use serde_json::Value;
 use std::error::Error;
-use std::collections::HashMap;
 
 #[derive(Args)]
 pub struct TestApiCommand {
     #[arg(short, long, default_value = "http://localhost:8080")]
-    pub server: String,
+    pub peer: String,
     
     #[arg(short, long)]
     pub verbose: bool,
@@ -28,7 +27,7 @@ struct ApiEndpoint {
 impl TestApiCommand {
     pub async fn execute(self) -> Result<(), Box<dyn Error>> {
         let client = Client::new();
-        let base_url = self.server.trim_end_matches('/');
+        let base_url = self.peer.trim_end_matches('/');
         
         println!("🧪 Testing all API endpoints for: {}", base_url);
         println!("==================================================");

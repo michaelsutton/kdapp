@@ -18,14 +18,14 @@ pub struct Cli {
 pub enum Commands {
     /// Test auth episode locally (no Kaspa)
     TestEpisode(test::TestEpisodeCommand),
-    /// Run HTTP coordination server for authentication
-    HttpServer(http_server::HttpServerCommand),
+    /// Run HTTP coordination organizer peer for authentication
+    HttpOrganizerPeer(http_organizer_peer::HttpOrganizerPeerCommand),
     /// 🚀 One-command authentication with HTTP server (EASY MODE)
     Authenticate(authenticate::AuthenticateCommand),
     /// Run interactive demo
     Demo(demo::DemoCommand),
-    /// Run auth server on Kaspa testnet-10
-    Server(server::ServerCommand),
-    /// Run auth client on Kaspa testnet-10
-    Client(client::ClientCommand),
+    /// Run auth organizer peer on Kaspa testnet-10
+    OrganizerPeer(organizer_peer::OrganizerPeerCommand),
+    /// Run auth participant peer on Kaspa testnet-10
+    ParticipantPeer(participant_peer::ParticipantPeerCommand),
 }

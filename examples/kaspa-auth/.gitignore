@@ -40,3 +40,9 @@ test_*.sh
 wallet.dat
 *-wallet.key
 private_key.txt
+my-key.txt
+kaspa_private.key
+participant-peer-wallet.key
+organizer-peer-wallet.key
+**/private_key*
+**/wallet*
