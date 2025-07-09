@@ -1,5 +1,5 @@
 // src/api/http/blockchain_engine.rs
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}, mpsc};
+use std::sync::{Arc, atomic::AtomicBool, mpsc};
 use std::collections::HashMap;
 use tokio::sync::broadcast;
 use secp256k1::Keypair;
@@ -13,30 +13,30 @@ use kaspa_consensus_core::network::{NetworkId, NetworkType};
 
 use crate::core::episode::SimpleAuth;
 use crate::core::commands::AuthCommand;
-use crate::api::http::state::{ServerState, WebSocketMessage, SharedEpisodeState};
+use crate::api::http::state::{PeerState, WebSocketMessage, SharedEpisodeState};
 use crate::episode_runner::{AUTH_PREFIX, AUTH_PATTERN};
 
-/// The main HTTP server that runs a real kdapp engine
-pub struct AuthHttpServer {
-    pub server_state: ServerState,
+/// The main HTTP coordination peer that runs a real kdapp engine
+pub struct AuthHttpPeer {
+    pub peer_state: PeerState,
     pub network: NetworkId,
     pub exit_signal: Arc<AtomicBool>,
 }
 
-impl AuthHttpServer {
+impl AuthHttpPeer {
     pub async fn new(
-        server_keypair: Keypair,
+        peer_keypair: Keypair,
         websocket_tx: broadcast::Sender<WebSocketMessage>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let network = NetworkId::with_suffix(NetworkType::Testnet, 10);
         
         let transaction_generator = Arc::new(TransactionGenerator::new(
-            server_keypair,
+            peer_keypair,
             AUTH_PATTERN,
             AUTH_PREFIX,
         ));
         
-        // Create shared episode state that both engine and HTTP server can access
+        // Create shared episode state that both engine and HTTP coordination peer can access
         let blockchain_episodes = Arc::new(std::sync::Mutex::new(HashMap::new()));
         
         // Create kaspad client for transaction submission
@@ -52,32 +52,32 @@ impl AuthHttpServer {
             }
         };
         
-        let server_state = ServerState {
+        let peer_state = PeerState {
             episodes: Arc::new(std::sync::Mutex::new(HashMap::new())),  // Legacy
             blockchain_episodes: blockchain_episodes.clone(),  // NEW - real blockchain state
             websocket_tx,
-            server_keypair,
+            peer_keypair,
             transaction_generator,
             kaspad_client,  // NEW - for actual transaction submission
         };
         
         let exit_signal = Arc::new(AtomicBool::new(false));
         
-        Ok(AuthHttpServer {
-            server_state,
+        Ok(AuthHttpPeer {
+            peer_state,
             network,
             exit_signal,
         })
     }
     
-    /// Start the blockchain listener - this makes HTTP server a real kdapp node!
+    /// Start the blockchain listener - this makes HTTP coordination peer a real kdapp node!
     pub async fn start_blockchain_listener(self: Arc<Self>) -> Result<(), Box<dyn std::error::Error>> {
         let (tx, rx) = mpsc::channel();
         
         // Create the episode handler that will process blockchain updates
         let auth_handler = HttpAuthHandler {
-            websocket_tx: self.server_state.websocket_tx.clone(),
-            blockchain_episodes: self.server_state.blockchain_episodes.clone(),
+            websocket_tx: self.peer_state.websocket_tx.clone(),
+            blockchain_episodes: self.peer_state.blockchain_episodes.clone(),
         };
         
         // Start the kdapp engine in a background task
@@ -99,7 +99,7 @@ impl AuthHttpServer {
             kdapp::proxy::run_listener(kaspad, engines, exit_signal_clone).await;
         });
         
-        println!("🔗 kdapp engine started - HTTP server is now a real blockchain node!");
+        println!("🔗 kdapp engine started - HTTP coordination peer is now a real blockchain node!");
         
         // Wait for either task to complete
         tokio::select! {
@@ -114,10 +114,10 @@ impl AuthHttpServer {
         Ok(())
     }
     
-    /// Set the auth server reference in the server state
-    pub fn set_self_reference(mut self, auth_server: Arc<AuthHttpServer>) -> Self {
+    /// Set the auth peer reference in the peer state
+    pub fn set_self_reference(self, _auth_peer: Arc<AuthHttpPeer>) -> Self {
         // This creates a circular reference which is fine for this use case
-        // The auth_server field allows handlers to access the kdapp engine
+        // The auth_peer field allows handlers to access the kdapp engine
         // We'll use weak references if needed later
         self
     }
@@ -126,7 +126,7 @@ impl AuthHttpServer {
     pub fn get_episode_state(&self, episode_id: EpisodeId) -> Option<SimpleAuth> {
         println!("🔍 Querying blockchain episode state for episode {}", episode_id);
         
-        match self.server_state.blockchain_episodes.lock() {
+        match self.peer_state.blockchain_episodes.lock() {
             Ok(episodes) => {
                 if let Some(episode) = episodes.get(&(episode_id as u64)) {
                     println!("✅ Found episode {} in blockchain state", episode_id);

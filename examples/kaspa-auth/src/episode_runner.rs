@@ -5,9 +5,6 @@ use std::collections::HashMap;
 use secp256k1::Keypair;
 use log::{info, warn, error};
 use serde::{Serialize, Deserialize};
-use tokio::net::{TcpListener, TcpStream};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use rand::Rng;
 use reqwest::Client;
 use serde_json::json;
 

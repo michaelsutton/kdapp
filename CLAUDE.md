@@ -1,5 +1,29 @@
 # Kaspa Auth - Episode-First Implementation
 
+## 🌐 FUNDAMENTAL: kdapp is Peer-to-Peer, NOT Client-Server
+
+### ❌ WRONG Hierarchical Thinking:
+- "Server" controls authentication
+- "Client" requests permission from server
+- HTTP endpoints are the source of truth
+- Traditional client-server architecture
+
+### ✅ CORRECT Peer-to-Peer Reality:
+- **HTTP Organizer Peer**: Organizes episode coordination via HTTP interface
+- **Web Participant Peer**: Participant accessing via browser
+- **CLI Participant Peer**: Participant accessing via command line
+- **Blockchain**: The ONLY source of truth
+- **Episodes**: Shared state between equal peers
+
+### 🗣️ REQUIRED Terminology:
+- **"HTTP Organizer Peer"** (not "server")
+- **"Web Participant Peer"** (not "client")
+- **"Organizer Peer"** (role, not hierarchy)
+- **"Participant Peer"** (role, not hierarchy)
+- **"Peer Address"** (not "server address" or "client address")
+
+**Why This Matters**: When we use "server/client" language, we unconsciously default to hierarchical thinking patterns that are fundamentally wrong for kdapp architecture. This causes implementation bugs, security issues, and architectural confusion.
+
 ## 🎯 Goal
 Build authentication as a Kaspa Episode FIRST, integrate wallet management SECOND.
 
@@ -66,14 +90,14 @@ Simple challenge-response auth that works on Kaspa. Period.
 
 **File: `examples/auth_demo.rs`**
 ```rust
-// TODO: Simple two-terminal demo
-// Terminal 1: cargo run --example auth_demo -- server
-// Terminal 2: cargo run --example auth_demo -- client --auth
+// TODO: Simple two-peer demo
+// Terminal 1: cargo run --example auth_demo -- organizer-peer
+// Terminal 2: cargo run --example auth_demo -- participant-peer --auth
 ```
 
 **Success Criteria:**
 - [ ] Alice initiates auth episode on Kaspa
-- [ ] Bob (server) sees request and sends challenge
+- [ ] Bob (organizer peer) sees request and sends challenge
 - [ ] Alice signs challenge and responds
 - [ ] Bob verifies and confirms authentication
 - [ ] Both parties see "✅ Authenticated!" 
@@ -173,9 +197,9 @@ cargo test test_auth_episode_logic
 cargo run -- test-local
 
 # Day 3: Full demo on testnet-10
-cargo run --example auth_demo -- server
+cargo run --example auth_demo -- organizer-peer
 # In another terminal:
-cargo run --example auth_demo -- client --key <your-test-key>
+cargo run --example auth_demo -- participant-peer --key <your-test-key>
 
 # Week 2: With API
 curl -X POST http://localhost:8080/auth/start
@@ -186,7 +210,7 @@ curl -X POST http://localhost:8080/auth/start
 ## 🎯 Success Metrics
 
 ### Phase 1 Success = 
-- [ ] Two parties can authenticate via Kaspa transactions
+- [ ] Two peers can authenticate via Kaspa transactions
 - [ ] Total code < 500 lines
 - [ ] No external dependencies beyond kdapp + kaspa crates
 - [ ] Works on testnet-10
@@ -241,20 +265,20 @@ so users can sign challenges with their existing wallet."
 You know Phase 1 is complete when you can:
 
 1. Open two terminals
-2. Run server in terminal 1
-3. Run client in terminal 2  
+2. Run organizer peer in terminal 1
+3. Run participant peer in terminal 2  
 4. See this interaction:
 
 ```
 Terminal 1:
-$ cargo run --example auth_demo -- server
-🎯 Auth server started on testnet-10
+$ cargo run --example auth_demo -- organizer-peer
+🎯 Auth organizer peer started on testnet-10
 📨 Received auth request from kaspatest:xyz...
 🎲 Sending challenge: "auth_1234567890"
 ✅ Signature verified! User authenticated.
 
 Terminal 2:
-$ cargo run --example auth_demo -- client --auth
+$ cargo run --example auth_demo -- participant-peer --auth
 🔑 Starting auth for key: kaspatest:xyz...
 📨 Received challenge: "auth_1234567890"
 ✍️  Signing challenge...

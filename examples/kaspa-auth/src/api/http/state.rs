@@ -18,11 +18,11 @@ pub struct EpisodeState {
 }
 
 #[derive(Clone)]
-pub struct ServerState {
+pub struct PeerState {
     pub episodes: Arc<Mutex<HashMap<u64, EpisodeState>>>,  // Legacy - will remove
     pub blockchain_episodes: SharedEpisodeState,  // NEW - real blockchain state
     pub websocket_tx: broadcast::Sender<WebSocketMessage>,
-    pub server_keypair: Keypair,
+    pub peer_keypair: Keypair,
     pub transaction_generator: Arc<TransactionGenerator>,
     pub kaspad_client: Option<Arc<KaspaRpcClient>>,  // NEW - for transaction submission
 }

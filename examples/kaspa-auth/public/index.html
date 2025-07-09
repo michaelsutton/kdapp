@@ -302,16 +302,19 @@
         <div id="fundingInfo" class="info-card" style="margin-bottom: 30px; display: none;">
             <h3>💰 Address Information</h3>
             <div style="font-family: 'Courier New', monospace; font-size: 0.9em; line-height: 1.8;">
-                <div><strong>🖥️ Server Address (Coordination):</strong> <span id="serverAddress">Loading...</span></div>
-                <div style="font-size: 0.8em; color: #666; margin-left: 20px;">Only shows funding transactions (1000 TKAS)</div>
-                <div style="margin-top: 10px;"><strong>📱 Client Address (Authentication):</strong> <span id="clientAuthAddress">Generated per session</span></div>
-                <div style="font-size: 0.8em; color: #666; margin-left: 20px;">Check console for real authentication address</div>
+                <div><strong>🖥️ Organizer Peer Address (Coordination Only):</strong> <span id="serverAddress">Loading...</span></div>
+                <div style="font-size: 0.8em; color: #666; margin-left: 20px;">Pre-funded for coordination - you don't need to fund this</div>
+                <div style="margin-top: 10px;"><strong>💰 Your Participant Address (YOU FUND THIS):</strong> <span id="clientAuthAddress">Will be shown after clicking authenticate</span></div>
+                <div style="font-size: 0.8em; color: #22c55e; margin-left: 20px; font-weight: bold;">⚠️ This is the address YOU need to fund for authentication transactions!</div>
                 <div style="margin-top: 10px;"><strong>🌐 Network:</strong> <span id="networkInfo">testnet-10</span></div>
                 <div><strong>🏷️ Transaction Prefix:</strong> <span id="txPrefix">0x41555448 (AUTH)</span></div>
                 <div style="margin-top: 15px;">
                     <strong>🔍 Explorer Links:</strong><br>
                     <a href="#" id="explorerLink" target="_blank" style="color: #70c7ba; text-decoration: none;">
-                        🔗 View Server Address (Coordination)
+                        🔗 View Organizer Address (Coordination Only)
+                    </a><br>
+                    <a href="#" id="participantExplorerLink" target="_blank" style="color: #f59e0b; text-decoration: none; font-weight: bold;">
+                        💰 View YOUR Participant Address (Payment Confirmation)
                     </a><br>
                     <a href="https://faucet.kaspanet.io/" target="_blank" style="color: #70c7ba; text-decoration: none;">
                         🚰 Get Testnet Funds
@@ -331,10 +334,10 @@
                 signs challenges with actual cryptography, and submits verification to Kaspa blockchain.
                 <br><strong>⚡ Live Experience:</strong> Watch real-time blockchain confirmation via WebSocket!
             </div>
-            <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 10px; margin: 10px 0; font-size: 0.9em; color: #111;">
-                <strong>🔍 Address Investigation:</strong> The server address above only shows coordination (1000 TKAS funding). 
-                For AUTH transactions, check the <strong>client address</strong> shown in browser console after clicking authenticate!
-                <br><strong>📊 Authentication reuses the SAME client address</strong> - persistent episodes until reset.
+            <div style="background: #dcfce7; border: 1px solid #86efac; border-radius: 5px; padding: 10px; margin: 10px 0; font-size: 0.9em; color: #111;">
+                <strong>🎯 True Peer-to-Peer Architecture:</strong> Each participant funds their own authentication transactions.
+                <br><strong>💰 You need to fund YOUR participant address</strong> (shown in console) to authenticate.
+                <br><strong>🖥️ Organizer address above</strong> is only for coordination - you don't need to fund it.
             </div>
             <button id="authButton" class="auth-button" onclick="startAuthentication()">
                 🔑 Start Authentication Flow
@@ -378,11 +381,11 @@
                 <p style="font-size: 0.9em;">
                     Search for episode ID <span id="searchEpisodeId"></span> on 
                     <a href="#" id="successExplorerLink" target="_blank" style="color: white; text-decoration: underline;">
-                        Kaspa Explorer
+                        YOUR Participant Address Explorer
                     </a>
                 </p>
                 <p style="font-size: 0.8em; opacity: 0.8;">
-                    Look for transactions with AUTH prefix (0x41555448) containing your episode ID
+                    Look for transactions with AUTH prefix (0x41555448) containing your episode ID on YOUR funded address
                 </p>
             </div>
         </div>
@@ -427,14 +430,22 @@
             
             <div class="info-card" style="color: #111;">
                 <h3>🛠️ Development Tools</h3>
+                <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 10px; margin: 10px 0; font-size: 0.9em; color: #111;">
+                    <strong>⚠️ CRITICAL for First-Time Users:</strong> Add <code>--bin kaspa-auth</code> to all cargo commands!<br>
+                    <strong>Example:</strong> <code>cargo run --bin kaspa-auth -- test-api-flow --server http://localhost:8080</code>
+                </div>
                 <div class="endpoint-list">
                     <div class="endpoint-item">
                         <strong>CLI Test:</strong><br>
-                        <code>cargo run -- test-api-flow</code>
+                        <code>cargo run --bin kaspa-auth -- test-api-flow --server http://localhost:8080</code>
                     </div>
                     <div class="endpoint-item">
                         <strong>Manual Auth:</strong><br>
-                        <code>cargo run -- authenticate</code>
+                        <code>cargo run --bin kaspa-auth -- authenticate --peer http://localhost:8080</code>
+                    </div>
+                    <div class="endpoint-item">
+                        <strong>Start HTTP Peer:</strong><br>
+                        <code>cargo run --bin kaspa-auth -- http-peer --port 8080</code>
                     </div>
                 </div>
             </div>
@@ -447,6 +458,7 @@
 
         let websocket = null;
         let currentEpisodeId = null;
+        let clientKaspaAddress = null; // Store globally for WebSocket access
         let privateKey = null;
         let publicKeyHex = null;
 
@@ -496,7 +508,7 @@
                     // JavaScript-safe episode IDs can be compared directly
                     if (message.episode_id === currentEpisodeId) {
                         updateStep(6, 'complete');
-                        showSuccess(message.session_token, message.episode_id);
+                        showSuccess(message.session_token, message.episode_id, clientKaspaAddress);
                     }
                     break;
                     
@@ -526,7 +538,7 @@
                 
                 const walletData = await walletResponse.json();
                 publicKeyHex = walletData.public_key;
-                let clientKaspaAddress = walletData.kaspa_address;
+                clientKaspaAddress = walletData.kaspa_address; // Store globally
                 
                 console.log('🔍 DEBUG: Using persistent client wallet');
                 console.log('🔍 DEBUG: Public key:', publicKeyHex);
@@ -534,10 +546,22 @@
                 console.log('🔍 DEBUG: Was created:', walletData.was_created);
                 console.log('🔍 DEBUG: Needs funding:', walletData.needs_funding);
                 
+                // Update UI to show participant address
+                document.getElementById('clientAuthAddress').textContent = clientKaspaAddress;
+                
+                // Set participant explorer link
+                const participantExplorerUrl = `https://explorer-tn10.kaspa.org/addresses/${clientKaspaAddress}`;
+                const participantExplorerLink = document.getElementById('participantExplorerLink');
+                if (participantExplorerLink) {
+                    participantExplorerLink.href = participantExplorerUrl;
+                }
+                
                 if (walletData.needs_funding) {
-                    console.log('⚠️ WARNING: Client wallet needs funding!');
+                    console.log('⚠️ WARNING: Participant wallet needs funding!');
                     console.log('🚰 Get testnet funds: https://faucet.kaspanet.io/');
                     console.log('💰 Send to address:', clientKaspaAddress);
+                    console.log('🎯 This is YOUR address - you fund authentication transactions');
+                    console.log('🔍 Check payment confirmation: ' + participantExplorerUrl);
                 }
                 
                 updateStep(1, 'complete');
@@ -556,7 +580,7 @@
                 
                 const startData = await startResponse.json();
                 currentEpisodeId = startData.episode_id;
-                clientKaspaAddress = startData.client_kaspa_address;
+                // clientKaspaAddress already set from wallet data above
                 
                 console.log('🔍 DEBUG: Episode created:', currentEpisodeId);
                 console.log('🔍 DEBUG: Client Kaspa address:', clientKaspaAddress);

@@ -1,6 +1,5 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use kdapp::pki::PubKey;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Rollback information for authentication operations

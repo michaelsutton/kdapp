@@ -4,16 +4,16 @@ use log::info;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use serde_json;
-use crate::api::http::state::ServerState;
+use crate::api::http::state::PeerState;
 
 pub async fn websocket_handler(
     ws: WebSocketUpgrade,
-    State(state): State<ServerState>,
+    State(state): State<PeerState>,
 ) -> impl IntoResponse {
     ws.on_upgrade(|socket| handle_socket(socket, state))
 }
 
-async fn handle_socket(socket: WebSocket, state: ServerState) {
+async fn handle_socket(socket: WebSocket, state: PeerState) {
     info!("New WebSocket connection established.");
     let mut rx = state.websocket_tx.subscribe();
 

@@ -1,5 +1,5 @@
 // src/api/http/mod.rs
-pub mod server;
+pub mod organizer_peer;
 pub mod state;
 pub mod types;
 pub mod websocket;

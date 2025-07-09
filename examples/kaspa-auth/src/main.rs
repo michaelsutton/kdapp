@@ -9,7 +9,7 @@ use kaspa_auth::core::episode::SimpleAuth;
 use kaspa_auth::core::commands::AuthCommand;
 use kaspa_auth::{AuthServerConfig, run_auth_server};
 use kaspa_auth::wallet::get_wallet_for_command;
-use kaspa_auth::api::http::server::run_http_server;
+use kaspa_auth::api::http::organizer_peer::run_http_peer;
 
 use kaspa_auth::cli::commands::test_api_flow::TestApiFlowCommand;
 use kdapp::pki::{generate_keypair, sign_message, to_message};
@@ -38,14 +38,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 )
         )
         .subcommand(
-            Command::new("http-server")
-                .about("Run HTTP coordination server for authentication")
+            Command::new("http-peer")
+                .about("Run HTTP coordination peer for authentication")
                 .arg(
                     Arg::new("port")
                         .short('p')
                         .long("port")
                         .value_name("PORT")
-                        .help("HTTP server port")
+                        .help("HTTP coordination peer port")
                         .default_value("8080")
                 )
                 .arg(
@@ -58,13 +58,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         )
         .subcommand(
             Command::new("authenticate")
-                .about("🚀 One-command authentication with HTTP server (EASY MODE)")
+                .about("🚀 One-command authentication with HTTP coordination peer (EASY MODE)")
                 .arg(
-                    Arg::new("server")
-                        .short('s')
-                        .long("server")
+                    Arg::new("peer")
+                        .short('p')
+                        .long("peer")
                         .value_name("URL")
-                        .help("HTTP server URL")
+                        .help("HTTP coordination peer URL")
                         .default_value("http://127.0.0.1:8080")
                 )
                 .arg(
@@ -87,15 +87,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 .about("Run interactive demo")
         )
         .subcommand(
-            Command::new("server")
-                .about("Run auth server on Kaspa testnet-10")
+            Command::new("organizer-peer")
+                .about("Run auth organizer peer on Kaspa testnet-10")
                 .arg(
                     Arg::new("name")
                         .short('n')
                         .long("name")
                         .value_name("NAME")
-                        .help("Server name")
-                        .default_value("auth-server")
+                        .help("Organizer peer name")
+                        .default_value("auth-organizer-peer")
                 )
                 .arg(
                     Arg::new("key")
@@ -127,8 +127,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 )
         )
         .subcommand(
-            Command::new("client")
-                .about("Run auth client on Kaspa testnet-10")
+            Command::new("participant-peer")
+                .about("Run auth participant peer on Kaspa testnet-10")
                 .arg(
                     Arg::new("auth")
                         .long("auth")
@@ -166,11 +166,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Command::new("test-api-flow")
                 .about("Run a full API authentication flow test")
                 .arg(
-                    Arg::new("server")
-                        .short('s')
-                        .long("server")
+                    Arg::new("peer")
+                        .short('p')
+                        .long("peer")
                         .value_name("URL")
-                        .help("HTTP server URL")
+                        .help("HTTP coordination peer URL")
                         .default_value("http://127.0.0.1:8080")
                 )
         )
@@ -178,11 +178,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Command::new("test-api")
                 .about("Run tests against all API endpoints")
                 .arg(
-                    Arg::new("server")
-                        .short('s')
-                        .long("server")
+                    Arg::new("peer")
+                        .short('p')
+                        .long("peer")
                         .value_name("URL")
-                        .help("HTTP server URL")
+                        .help("HTTP coordination peer URL")
                         .default_value("http://127.0.0.1:8080")
                 )
         )
@@ -198,7 +198,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             
             test_episode_logic(participant_count)?;
         }
-        Some(("http-server", sub_matches)) => {
+        Some(("http-peer", sub_matches)) => {
             let port: u16 = sub_matches
                 .get_one::<String>("port")
                 .unwrap()
@@ -206,10 +206,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 .unwrap_or(8080);
             
             let provided_private_key = sub_matches.get_one::<String>("key").map(|s| s.as_str());
-            run_http_server(provided_private_key, port).await?;
+            run_http_peer(provided_private_key, port).await?;
         }
         Some(("authenticate", sub_matches)) => {
-            let server_url = sub_matches.get_one::<String>("server").unwrap().clone();
+            let peer_url = sub_matches.get_one::<String>("peer").unwrap().clone();
             
             // Get private key using unified wallet system
             let keypair = if let Some(keyfile_path) = sub_matches.get_one::<String>("keyfile") {
@@ -220,23 +220,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 wallet.keypair
             };
             
-            println!("🚀 Starting automatic authentication with server: {}", server_url);
-            run_automatic_authentication(server_url, keypair).await?;
+            println!("🚀 Starting automatic authentication with coordination peer: {}", peer_url);
+            run_automatic_authentication(peer_url, keypair).await?;
         }
         Some(("demo", _)) => {
             run_interactive_demo()?;
         }
-        Some(("server", sub_matches)) => {
+        Some(("organizer-peer", sub_matches)) => {
             use kaspa_auth::wallet::get_wallet_for_command;
             
             let name = sub_matches.get_one::<String>("name").unwrap().clone();
             let rpc_url = sub_matches.get_one::<String>("rpc-url").cloned();
             let provided_private_key = sub_matches.get_one::<String>("key").map(|s| s.as_str());
             
-            let wallet = get_wallet_for_command("server", provided_private_key)?;
-            run_kaspa_server(wallet.keypair, name, rpc_url).await?;
+            let wallet = get_wallet_for_command("organizer-peer", provided_private_key)?;
+            run_kaspa_organizer_peer(wallet.keypair, name, rpc_url).await?;
         }
-        Some(("client", sub_matches)) => {
+        Some(("participant-peer", sub_matches)) => {
             let should_auth = sub_matches.get_flag("auth");
             let rpc_url = sub_matches.get_one::<String>("rpc-url").cloned();
             
@@ -253,7 +253,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     kaspa_addresses::Version::PubKey,
                     &keypair.x_only_public_key().0.serialize()
                 );
-                println!("🔑 No --kaspa-private-key or --kaspa-keyfile provided. Generated new client wallet:");
+                println!("🔑 No --kaspa-private-key or --kaspa-keyfile provided. Generated new participant peer wallet:");
                 println!("📍 Kaspa Address: {}", kaspa_addr);
                 println!("🔐 Private Key: {}", hex::encode(keypair.secret_key().secret_bytes()));
                 println!();
@@ -265,16 +265,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 println!("🌐 Network: testnet-10 (for development and testing)");
                 println!("💡 Amount needed: ~0.1 KAS (covers multiple authentication transactions)");
                 println!();
-                println!("📋 Steps to fund your client wallet:");
+                println!("📋 Steps to fund your participant peer wallet:");
                 println!("  1. Copy the Kaspa address above: {}", kaspa_addr);
                 println!("  2. Visit: https://faucet.kaspanet.io/");
                 println!("  3. Paste the address and request testnet funds");
                 println!("  4. Wait ~30 seconds for transaction confirmation");
                 println!();
                 println!("🚀 After funding, run blockchain authentication:");
-                println!("cargo run -p kaspa-auth -- client --auth --kaspa-keyfile kaspa_private.key");
+                println!("cargo run -p kaspa-auth -- participant-peer --auth --kaspa-keyfile kaspa_private.key");
                 println!("or");
-                println!("cargo run -p kaspa-auth -- client --auth --kaspa-private-key {}", hex::encode(keypair.secret_key().secret_bytes()));
+                println!("cargo run -p kaspa-auth -- participant-peer --auth --kaspa-private-key {}", hex::encode(keypair.secret_key().secret_bytes()));
                 println!();
                 println!("🎯 This will create REAL blockchain transactions on Kaspa testnet-10!");
                 println!("📊 You can verify transactions at: https://explorer.kaspa.org/");
@@ -285,20 +285,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
             
             // Get auth keypair (for episode authentication)
             let provided_private_key = sub_matches.get_one::<String>("key").map(|s| s.as_str());
-            let wallet = get_wallet_for_command("client", provided_private_key)?;
+            let wallet = get_wallet_for_command("participant-peer", provided_private_key)?;
             
-            run_kaspa_client(kaspa_keypair, wallet.keypair, should_auth, rpc_url).await?;
+            run_kaspa_participant_peer(kaspa_keypair, wallet.keypair, should_auth, rpc_url).await?;
         }
         
         Some(("test-api-flow", sub_matches)) => {
-            let server_url = sub_matches.get_one::<String>("server").unwrap().clone();
-            let command = TestApiFlowCommand { server: server_url };
+            let peer_url = sub_matches.get_one::<String>("peer").unwrap().clone();
+            let command = TestApiFlowCommand { peer: peer_url };
             command.execute().await?;
         }
         Some(("test-api", sub_matches)) => {
-            let server_url = sub_matches.get_one::<String>("server").unwrap().clone();
+            let peer_url = sub_matches.get_one::<String>("peer").unwrap().clone();
             let command = kaspa_auth::cli::commands::test_api::TestApiCommand { 
-                server: server_url, 
+                peer: peer_url, 
                 verbose: false, 
                 json: false 
             };
@@ -309,10 +309,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             println!("\nAvailable commands:");
             println!("  authenticate  - 🚀 Easy one-command authentication (RECOMMENDED)");
             println!("  test-episode  - Test locally (no Kaspa network)");
-            println!("  http-server   - Run HTTP coordination server");
+            println!("  http-peer     - Run HTTP coordination peer");
             println!("  demo         - Interactive demo (simulated)");
-            println!("  server       - Run auth server on testnet-10");
-            println!("  client       - Run auth client on testnet-10");
+            println!("  organizer-peer - Run auth organizer peer on testnet-10");
+            println!("  participant-peer - Run auth participant peer on testnet-10");
         }
     }
 
@@ -501,8 +501,8 @@ fn load_private_key_from_file(path: &str) -> Result<Keypair, Box<dyn Error>> {
 }
 
 /// Run Kaspa authentication server
-async fn run_kaspa_server(signer: Keypair, name: String, rpc_url: Option<String>) -> Result<(), Box<dyn Error>> {
-    println!("🎯 Starting Kaspa Auth Server: {}", name);
+async fn run_kaspa_organizer_peer(signer: Keypair, name: String, rpc_url: Option<String>) -> Result<(), Box<dyn Error>> {
+    println!("🎯 Starting Kaspa Auth Organizer Peer: {}", name);
     if let Some(url) = &rpc_url {
         println!("📡 Connecting to node: {}", url);
     } else {
@@ -516,8 +516,8 @@ async fn run_kaspa_server(signer: Keypair, name: String, rpc_url: Option<String>
 }
 
 /// Run Kaspa authentication client
-async fn run_kaspa_client(kaspa_signer: Keypair, auth_signer: Keypair, should_auth: bool, rpc_url: Option<String>) -> Result<(), Box<dyn Error>> {
-    println!("🔑 Starting Kaspa Auth Client");
+async fn run_kaspa_participant_peer(kaspa_signer: Keypair, auth_signer: Keypair, should_auth: bool, rpc_url: Option<String>) -> Result<(), Box<dyn Error>> {
+    println!("🔑 Starting Kaspa Auth Participant Peer");
     if let Some(url) = &rpc_url {
         println!("📡 Connecting to node: {}", url);
     } else {
@@ -529,12 +529,12 @@ async fn run_kaspa_client(kaspa_signer: Keypair, auth_signer: Keypair, should_au
         println!("🎯 This will create REAL transactions on Kaspa testnet-10");
         run_client_authentication(kaspa_signer, auth_signer).await?;
     } else {
-        println!("👂 Client mode: Listening for authentication requests...");
+        println!("👂 Participant peer mode: Listening for authentication requests...");
         println!("💡 Tip: Add --auth flag to initiate authentication instead of listening");
-        println!("📖 Example: cargo run -- client --auth --kaspa-keyfile your_key.txt");
+        println!("📖 Example: cargo run -- participant-peer --auth --kaspa-keyfile your_key.txt");
         println!();
         // For now, just run a server instance
-        let config = AuthServerConfig::new(kaspa_signer, "auth-client".to_string(), rpc_url);
+        let config = AuthServerConfig::new(kaspa_signer, "auth-participant-peer".to_string(), rpc_url);
         run_auth_server(config).await?;
     }
     
@@ -817,7 +817,7 @@ async fn run_client_authentication(kaspa_signer: Keypair, auth_signer: Keypair) 
 }
 
 /// 🚀 Automatic authentication - handles entire flow seamlessly
-async fn run_automatic_authentication(server_url: String, keypair: Keypair) -> Result<(), Box<dyn Error>> {
+async fn run_automatic_authentication(peer_url: String, keypair: Keypair) -> Result<(), Box<dyn Error>> {
     use serde_json::Value;
     
     let client = reqwest::Client::new();
@@ -829,7 +829,7 @@ async fn run_automatic_authentication(server_url: String, keypair: Keypair) -> R
     // Step 1: Create episode
     println!("📝 Step 1: Creating authentication episode...");
     let start_response = client
-        .post(&format!("{}/auth/start", server_url))
+        .post(&format!("{}/auth/start", peer_url))
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({
             "public_key": public_key_hex
@@ -850,7 +850,7 @@ async fn run_automatic_authentication(server_url: String, keypair: Keypair) -> R
     // Step 2: Request challenge
     println!("🎲 Step 2: Requesting challenge from blockchain...");
     let challenge_response = client
-        .post(&format!("{}/auth/request-challenge", server_url))
+        .post(&format!("{}/auth/request-challenge", peer_url))
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({
             "episode_id": episode_id,
@@ -872,7 +872,7 @@ async fn run_automatic_authentication(server_url: String, keypair: Keypair) -> R
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         
         let status_response = client
-            .get(&format!("{}/auth/status/{}", server_url, episode_id))
+            .get(&format!("{}/auth/status/{}", peer_url, episode_id))
             .send()
             .await?;
         
@@ -905,7 +905,7 @@ async fn run_automatic_authentication(server_url: String, keypair: Keypair) -> R
     // Step 5: Submit verification
     println!("📤 Step 5: Submitting authentication response...");
     let verify_response = client
-        .post(&format!("{}/auth/verify", server_url))
+        .post(&format!("{}/auth/verify", peer_url))
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({
             "episode_id": episode_id,
@@ -926,7 +926,7 @@ async fn run_automatic_authentication(server_url: String, keypair: Keypair) -> R
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
     
     let final_status = client
-        .get(&format!("{}/auth/status/{}", server_url, episode_id))
+        .get(&format!("{}/auth/status/{}", peer_url, episode_id))
         .send()
         .await?;
     

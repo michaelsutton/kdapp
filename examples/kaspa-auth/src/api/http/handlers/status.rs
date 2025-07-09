@@ -2,12 +2,11 @@
 use axum::{extract::{State, Path}, response::Json, http::StatusCode};
 use serde_json::json;
 use crate::api::http::{
-    types::EpisodeStatus,
-    state::ServerState,
+    state::PeerState,
 };
 
 pub async fn get_status(
-    State(state): State<ServerState>,
+    State(state): State<PeerState>,
     Path(episode_id): Path<u64>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     println!("🔍 Querying episode {} from REAL blockchain state (not memory!)", episode_id);

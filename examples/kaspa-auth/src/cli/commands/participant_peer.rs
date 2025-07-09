@@ -2,7 +2,7 @@ use clap::Args;
 use std::error::Error;
 
 #[derive(Args)]
-pub struct ClientCommand {
+pub struct ParticipantPeerCommand {
     #[arg(long)]
     pub auth: bool,
     
@@ -16,7 +16,7 @@ pub struct ClientCommand {
     pub rpc_url: Option<String>,
 }
 
-impl ClientCommand {
+impl ParticipantPeerCommand {
     pub async fn execute(self) -> Result<(), Box<dyn Error>> {
         println!("Running Kaspa auth client");
         // Implementation would go here

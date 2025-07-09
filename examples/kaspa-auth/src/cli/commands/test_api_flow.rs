@@ -3,17 +3,16 @@ use reqwest::Client;
 use serde_json::Value;
 use secp256k1::{Keypair, Secp256k1, SecretKey};
 use kdapp::pki::{sign_message, to_message};
-use rand::Rng;
 
 #[derive(Args)]
 pub struct TestApiFlowCommand {
     #[arg(short, long, default_value = "http://127.0.0.1:8080")]
-    pub server: String,
+    pub peer: String,
 }
 
 impl TestApiFlowCommand {
     pub async fn execute(self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("🚀 Starting API Flow Test against server: {}", self.server);
+        println!("🚀 Starting API Flow Test against coordination peer: {}", self.peer);
         let client = Client::new();
         
         let secp = Secp256k1::new();
@@ -27,7 +26,7 @@ impl TestApiFlowCommand {
         println!("
 [1/5] Calling POST /auth/start...");
         let start_res = client
-            .post(format!("{}/auth/start", self.server))
+            .post(format!("{}/auth/start", self.peer))
             .json(&serde_json::json!({ "public_key": public_key_hex }))
             .send()
             .await?;
@@ -43,7 +42,7 @@ impl TestApiFlowCommand {
         println!("
 [2/5] Calling POST /auth/request-challenge...");
         let req_challenge_res = client
-            .post(format!("{}/auth/request-challenge", self.server))
+            .post(format!("{}/auth/request-challenge", self.peer))
             .json(&serde_json::json!({ "episode_id": episode_id, "public_key": public_key_hex }))
             .send()
             .await?;
@@ -57,7 +56,7 @@ impl TestApiFlowCommand {
 [3/5] Polling GET /auth/status/{} for challenge...", episode_id);
         let mut challenge = String::new();
         for _ in 0..10 {
-            let status_res = client.get(format!("{}/auth/status/{}", self.server, episode_id)).send().await?;
+            let status_res = client.get(format!("{}/auth/status/{}", self.peer, episode_id)).send().await?;
             let status_data: Value = status_res.json().await?;
             if let Some(c) = status_data["challenge"].as_str() {
                 challenge = c.to_string();
@@ -82,7 +81,7 @@ impl TestApiFlowCommand {
         println!("
 [5/5] Calling POST /auth/verify...");
         let verify_res = client
-            .post(format!("{}/auth/verify", self.server))
+            .post(format!("{}/auth/verify", self.peer))
             .json(&serde_json::json!({
                 "episode_id": episode_id,
                 "signature": signature_hex,
@@ -99,7 +98,7 @@ impl TestApiFlowCommand {
         println!("
 🏁 Verification complete! Checking final status...");
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        let final_status_res = client.get(format!("{}/auth/status/{}", self.server, episode_id)).send().await?;
+        let final_status_res = client.get(format!("{}/auth/status/{}", self.peer, episode_id)).send().await?;
         let final_status_data: Value = final_status_res.json().await?;
 
         println!("

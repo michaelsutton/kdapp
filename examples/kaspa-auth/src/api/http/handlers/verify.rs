@@ -5,25 +5,30 @@ use kaspa_consensus_core::tx::{TransactionOutpoint, UtxoEntry};
 use kaspa_wrpc_client::prelude::RpcApi;
 use kdapp::{
     engine::EpisodeMessage,
-    generator,
     pki::PubKey,
+    generator::TransactionGenerator,
 };
 use crate::api::http::{
     types::{VerifyRequest, VerifyResponse},
-    state::ServerState,
+    state::PeerState,
 };
 use crate::core::{episode::SimpleAuth, commands::AuthCommand};
 
 pub async fn verify_auth(
-    State(state): State<ServerState>,
+    State(state): State<PeerState>,
     Json(req): Json<VerifyRequest>,
 ) -> Result<Json<VerifyResponse>, StatusCode> {
+    println!("🔍 DEBUG: Verify request received - episode_id: {}, nonce: {}", req.episode_id, req.nonce);
+    println!("🔍 DEBUG: Signature length: {}", req.signature.len());
     println!("📤 Sending SubmitResponse command to blockchain...");
     
-    // Find the client public key from the episode
+    // Parse episode_id from request (u64)
+    let episode_id: u64 = req.episode_id;
+    
+    // Find the participant public key from the episode
     let episode = match state.blockchain_episodes.lock() {
         Ok(episodes) => {
-            episodes.get(&req.episode_id).cloned()
+            episodes.get(&episode_id).cloned()
         }
         Err(e) => {
             println!("❌ Failed to lock blockchain episodes: {}", e);
@@ -31,36 +36,46 @@ pub async fn verify_auth(
         }
     };
     
-    let client_pubkey = match episode {
+    let participant_pubkey = match episode {
         Some(ep) => ep.owner.unwrap_or_else(|| {
             println!("❌ Episode has no owner public key");
             // This shouldn't happen, but let's continue anyway
             PubKey(secp256k1::PublicKey::from_slice(&[2; 33]).unwrap())
         }),
         None => {
-            println!("❌ Episode {} not found in blockchain state", req.episode_id);
+            println!("❌ Episode {} not found in blockchain state", episode_id);
             return Err(StatusCode::NOT_FOUND);
         }
     };
     
-    // 🚨 CRITICAL FIX: Get client's secret key from their wallet
-    // In the CLI, client signs their own commands!
-    let client_wallet = crate::wallet::get_wallet_for_command("web-client", None)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let client_secret_key = client_wallet.keypair.secret_key();
+    // 🚨 CRITICAL: In HTTP demo mode, participant must sign the command
+    // The organizer can fund the transaction, but the participant must be the signer
+    // for the episode authorization to work correctly
     
-    // Create client Kaspa address for transaction funding (like CLI does)
-    let client_addr = Address::new(
+    // Create participant Kaspa address for transaction funding (like CLI does)
+    let _participant_addr = Address::new(
         Prefix::Testnet, 
         Version::PubKey, 
-        &client_pubkey.0.x_only_public_key().0.serialize()
+        &participant_pubkey.0.x_only_public_key().0.serialize()
     );
     
-    // Create server Kaspa address for transaction funding (server funds, client signs)
-    let server_addr = Address::new(
+    // 🎯 TRUE P2P: Participant funds their own transactions (like CLI)
+    let participant_wallet = crate::wallet::get_wallet_for_command("web-participant", None)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let participant_secret_key = participant_wallet.keypair.secret_key();
+    
+    // Create participant's Kaspa address for transaction funding (True P2P!)
+    let participant_addr = Address::new(
         Prefix::Testnet, 
         Version::PubKey, 
-        &state.server_keypair.x_only_public_key().0.serialize()
+        &participant_wallet.keypair.x_only_public_key().0.serialize()
+    );
+    
+    // 🚨 CRITICAL: Create participant's transaction generator for proper signing
+    let participant_generator = TransactionGenerator::new(
+        participant_wallet.keypair,
+        crate::episode_runner::AUTH_PATTERN,
+        crate::episode_runner::AUTH_PREFIX,
     );
     
     // Get REAL UTXOs from blockchain (exactly like CLI)
@@ -71,7 +86,7 @@ pub async fn verify_auth(
         // Wait a bit for the previous transaction to confirm
         tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
         
-        let entries = match kaspad.get_utxos_by_addresses(vec![server_addr.clone()]).await {
+        let entries = match kaspad.get_utxos_by_addresses(vec![participant_addr.clone()]).await {
             Ok(entries) => entries,
             Err(e) => {
                 println!("❌ Failed to fetch UTXOs: {}", e);
@@ -80,8 +95,9 @@ pub async fn verify_auth(
         };
         
         if entries.is_empty() {
-            println!("❌ No UTXOs found! Server wallet needs funding.");
-            println!("💰 Fund this address: {}", server_addr);
+            println!("❌ No UTXOs found! Participant wallet needs funding.");
+            println!("💰 Fund this address: {}", participant_addr);
+            println!("🚰 Get testnet funds: https://faucet.kaspanet.io/");
             return Err(StatusCode::SERVICE_UNAVAILABLE);
         }
         
@@ -102,21 +118,30 @@ pub async fn verify_auth(
         nonce: req.nonce.clone(),
     };
     
+    // Convert episode_id from u64 to u32 for EpisodeMessage (kdapp framework requirement)
+    let episode_id_u32 = match episode_id.try_into() {
+        Ok(id) => id,
+        Err(_) => {
+            println!("❌ Episode ID {} is too large to fit in u32", episode_id);
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    };
+    
     let step = EpisodeMessage::<SimpleAuth>::new_signed_command(
-        req.episode_id.try_into().unwrap(), 
+        episode_id_u32, 
         auth_command, 
-        client_secret_key, // 🚨 CRITICAL: Client signs their own commands!
-        client_pubkey
+        participant_secret_key, // 🚨 CRITICAL: Participant signs for episode authorization!
+        participant_pubkey // Use participant's public key for episode authorization
     );
     
     // Build and submit transaction to blockchain (exactly like CLI)
-    let tx = state.transaction_generator.build_command_transaction(utxo, &server_addr, &step, 5000);
+    let tx = participant_generator.build_command_transaction(utxo, &participant_addr, &step, 5000);
     println!("🚀 Submitting SubmitResponse transaction: {}", tx.id());
     
     let submission_result = match state.kaspad_client.as_ref().unwrap().submit_transaction(tx.as_ref().into(), false).await {
         Ok(_response) => {
             println!("✅ SubmitResponse transaction submitted to blockchain!");
-            println!("📊 Transactions are now being processed by auth server's kdapp engine");
+            println!("📊 Transactions are now being processed by auth organizer peer's kdapp engine");
             "submit_response_submitted"
         }
         Err(e) => {
@@ -126,7 +151,7 @@ pub async fn verify_auth(
     };
     
     Ok(Json(VerifyResponse {
-        episode_id: req.episode_id,
+        episode_id,
         authenticated: false, // Will be updated by blockchain when processed
         status: submission_result.to_string(),
     }))
