@@ -654,3 +654,85 @@ See the artifacts above - clean, focused, no mockery!
 > - kdapp best practices
 
 This is how you build REAL blockchain applications!
+## 🚨 HYBRID ARCHITECTURE EXCEPTION - READ CAREFULLY
+
+### ⚠️ CRITICAL: The ONE Allowed HTTP Fallback Exception
+
+**Location**: `src/main.rs` - `run_client_authentication()` function (lines ~691-778)
+
+**What it does**: 
+- Tries kdapp engine blockchain listening FIRST (10 attempts, 1 second timeout)
+- Only falls back to HTTP coordination if blockchain times out
+- This is the ONLY permitted HTTP fallback in the entire codebase
+
+**Why this exception exists**:
+- Real blockchain networks can be slow/unreliable
+- Organizer peer might not have kdapp engine running
+- Provides graceful degradation for user experience
+- Still uses real kdapp transactions - just coordinates challenge via HTTP
+
+### 🔒 STRICT RULES FOR THIS EXCEPTION
+
+#### ✅ ALLOWED uses of this pattern:
+- Only in `run_client_authentication()` function
+- Only after real kdapp engine timeout (not before)
+- Only for challenge coordination (not for episode creation/verification)
+- Must always try kdapp engine first
+
+#### ❌ FORBIDDEN uses of this pattern:
+- Creating new HTTP-first flows anywhere else
+- Using this as excuse to avoid kdapp architecture
+- Bypassing kdapp engine in other functions
+- Adding HTTP fallbacks to other authentication steps
+
+### 🎯 Code Pattern Recognition
+
+```rust
+// ✅ CORRECT - This is the ONE exception (existing code)
+if attempt_count >= max_attempts {
+    println\!("⚠️ Timeout waiting for challenge. Using HTTP fallback...");
+    let client = reqwest::Client::new(); // Only here\!
+    // ... HTTP coordination for challenge only
+}
+
+// ❌ WRONG - Never create new patterns like this
+fn some_new_function() {
+    let client = reqwest::Client::new(); // NO\! Use kdapp engine
+    // ... HTTP coordination
+}
+```
+
+### 📋 Before Adding ANY HTTP Code, Ask:
+
+1. **Am I in `run_client_authentication()`?** If no → Use kdapp engine
+2. **Did kdapp engine timeout first?** If no → Use kdapp engine  
+3. **Is this for challenge coordination only?** If no → Use kdapp engine
+4. **Is there an alternative kdapp solution?** If yes → Use kdapp engine
+
+### 💡 The Philosophy
+
+This exception exists because:
+- **Real-world reliability** > Pure architectural purity
+- **User experience** matters for authentication systems
+- **Graceful degradation** is better than hard failures
+- **But it's still 95% kdapp architecture** (blockchain transactions are real)
+
+### 🚫 What This Exception Does NOT Allow
+
+- HTTP-first authentication flows
+- Bypassing blockchain transactions
+- Creating new HTTP coordination patterns
+- Using this as justification for avoiding kdapp elsewhere
+
+### 🔧 Future Improvements
+
+Instead of adding more HTTP fallbacks:
+1. **Improve kdapp engine reliability**
+2. **Increase blockchain timeout settings**
+3. **Add better error handling to kdapp**
+4. **Optimize transaction confirmation times**
+
+---
+
+**Remember**: This is a **pragmatic exception**, not a **precedent**. Every other authentication component must use pure kdapp architecture.
+EOF < /dev/null

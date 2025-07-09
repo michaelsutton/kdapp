@@ -58,15 +58,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         )
         .subcommand(
             Command::new("authenticate")
-                .about("🚀 One-command authentication with HTTP coordination peer (EASY MODE)")
-                .arg(
-                    Arg::new("peer")
-                        .short('p')
-                        .long("peer")
-                        .value_name("URL")
-                        .help("HTTP coordination peer URL")
-                        .default_value("http://127.0.0.1:8080")
-                )
+                .about("🚀 One-command kdapp authentication (UNIFIED ARCHITECTURE)")
                 .arg(
                     Arg::new("key")
                         .short('k')
@@ -209,8 +201,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
             run_http_peer(provided_private_key, port).await?;
         }
         Some(("authenticate", sub_matches)) => {
-            let peer_url = sub_matches.get_one::<String>("peer").unwrap().clone();
-            
             // Get private key using unified wallet system
             let keypair = if let Some(keyfile_path) = sub_matches.get_one::<String>("keyfile") {
                 load_private_key_from_file(keyfile_path)?
@@ -220,8 +210,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 wallet.keypair
             };
             
-            println!("🚀 Starting automatic authentication with coordination peer: {}", peer_url);
-            run_automatic_authentication(peer_url, keypair).await?;
+            println!("🚀 Starting kdapp authentication (unified architecture)");
+            run_automatic_authentication(keypair).await?;
         }
         Some(("demo", _)) => {
             run_interactive_demo()?;
@@ -307,7 +297,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         _ => {
             println!("No subcommand specified. Use --help for available commands.");
             println!("\nAvailable commands:");
-            println!("  authenticate  - 🚀 Easy one-command authentication (RECOMMENDED)");
+            println!("  authenticate  - 🚀 kdapp authentication (UNIFIED ARCHITECTURE)");
             println!("  test-episode  - Test locally (no Kaspa network)");
             println!("  http-peer     - Run HTTP coordination peer");
             println!("  demo         - Interactive demo (simulated)");
@@ -816,140 +806,37 @@ async fn run_client_authentication(kaspa_signer: Keypair, auth_signer: Keypair) 
     Ok(())
 }
 
-/// 🚀 Automatic authentication - handles entire flow seamlessly
-async fn run_automatic_authentication(peer_url: String, keypair: Keypair) -> Result<(), Box<dyn Error>> {
-    use serde_json::Value;
-    
-    let client = reqwest::Client::new();
-    let public_key_hex = hex::encode(keypair.public_key().serialize());
-    
-    println!("🔑 Using public key: {}", public_key_hex);
+/// 🚀 Automatic authentication - uses REAL kdapp architecture (unified with participant-peer --auth)
+async fn run_automatic_authentication(keypair: Keypair) -> Result<(), Box<dyn Error>> {
+    println!("🎯 Starting kdapp-based authentication (unified architecture)");
+    println!("📱 This uses the same kdapp engine as participant-peer --auth");
+    println!("🔑 Using public key: {}", hex::encode(keypair.public_key().serialize()));
     println!();
+
+    // Use the same wallet system as participant-peer for consistency
+    let wallet = get_wallet_for_command("participant-peer", None)?;
     
-    // Step 1: Create episode
-    println!("📝 Step 1: Creating authentication episode...");
-    let start_response = client
-        .post(&format!("{}/auth/start", peer_url))
-        .header("Content-Type", "application/json")
-        .json(&serde_json::json!({
-            "public_key": public_key_hex
-        }))
-        .send()
-        .await?;
+    // Use the wallet's keypair for funding transactions (participant pays)
+    let funding_keypair = wallet.keypair;
+    let auth_keypair = keypair; // Use provided keypair for authentication
     
-    if !start_response.status().is_success() {
-        return Err(format!("Failed to create episode: {}", start_response.status()).into());
+    println!("💰 Funding transactions with participant wallet: {}", wallet.get_kaspa_address());
+    println!("🔐 Authentication keypair: {}", hex::encode(auth_keypair.public_key().serialize()));
+    
+    // Check if wallet needs funding
+    if wallet.check_funding_status() {
+        println!("⚠️  WARNING: Participant wallet may need funding for blockchain transactions!");
+        println!("💡 Get testnet funds: https://faucet.kaspanet.io/");
+        println!("💰 Fund address: {}", wallet.get_kaspa_address());
+        println!();
     }
     
-    let start_data: Value = start_response.json().await?;
-    let episode_id = start_data["episode_id"].as_u64()
-        .ok_or("Invalid episode_id in response")?;
+    // Use the REAL kdapp architecture - same as participant-peer --auth
+    run_client_authentication(funding_keypair, auth_keypair).await?;
     
-    println!("✅ Episode created: {}", episode_id);
-    
-    // Step 2: Request challenge
-    println!("🎲 Step 2: Requesting challenge from blockchain...");
-    let challenge_response = client
-        .post(&format!("{}/auth/request-challenge", peer_url))
-        .header("Content-Type", "application/json")
-        .json(&serde_json::json!({
-            "episode_id": episode_id,
-            "public_key": public_key_hex
-        }))
-        .send()
-        .await?;
-    
-    if !challenge_response.status().is_success() {
-        return Err(format!("Failed to request challenge: {}", challenge_response.status()).into());
-    }
-    
-    println!("✅ Challenge requested, waiting for blockchain processing...");
-    
-    // Step 3: Wait for challenge to be ready
-    println!("⏳ Step 3: Waiting for challenge generation...");
-    let mut challenge = String::new();
-    for attempt in 1..=10 {
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        
-        let status_response = client
-            .get(&format!("{}/auth/status/{}", peer_url, episode_id))
-            .send()
-            .await?;
-        
-        if status_response.status().is_success() {
-            let status_data: Value = status_response.json().await?;
-            if let Some(challenge_value) = status_data["challenge"].as_str() {
-                challenge = challenge_value.to_string();
-                println!("✅ Challenge received: {}", challenge);
-                break;
-            }
-        }
-        
-        if attempt < 10 {
-            print!("⏳ Attempt {}/10, still waiting...\r", attempt);
-            std::io::Write::flush(&mut std::io::stdout()).unwrap();
-        } else {
-            return Err("Timeout waiting for challenge generation".into());
-        }
-    }
-    println!();
-    
-    // Step 4: Sign challenge locally (SECURE - no private key sent!)
-    println!("✍️  Step 4: Signing challenge locally (private key stays secure)...");
-    let message = to_message(&challenge);
-    let signature = sign_message(&keypair.secret_key(), &message);
-    let signature_hex = hex::encode(signature.0.serialize_der());
-    
-    println!("✅ Challenge signed locally");
-    
-    // Step 5: Submit verification
-    println!("📤 Step 5: Submitting authentication response...");
-    let verify_response = client
-        .post(&format!("{}/auth/verify", peer_url))
-        .header("Content-Type", "application/json")
-        .json(&serde_json::json!({
-            "episode_id": episode_id,
-            "signature": signature_hex,
-            "nonce": challenge
-        }))
-        .send()
-        .await?;
-    
-    if !verify_response.status().is_success() {
-        return Err(format!("Failed to submit verification: {}", verify_response.status()).into());
-    }
-    
-    println!("✅ Authentication response submitted");
-    
-    // Step 6: Check final status
-    println!("🔍 Step 6: Checking authentication result...");
-    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-    
-    let final_status = client
-        .get(&format!("{}/auth/status/{}", peer_url, episode_id))
-        .send()
-        .await?;
-    
-    if final_status.status().is_success() {
-        let final_data: Value = final_status.json().await?;
-        let authenticated = final_data["authenticated"].as_bool().unwrap_or(false);
-        
-        if authenticated {
-            let session_token = final_data["session_token"].as_str().unwrap_or("none");
-            println!();
-            println!("🎉 SUCCESS! Authentication completed!");
-            println!("✅ Authenticated: true");
-            println!("🎟️  Session token: {}", session_token);
-            println!("📊 Episode ID: {}", episode_id);
-            println!();
-            println!("🚀 You are now authenticated with the Kaspa blockchain!");
-        } else {
-            println!("❌ Authentication failed - please check server logs");
-            return Err("Authentication verification failed".into());
-        }
-    } else {
-        return Err("Failed to check final authentication status".into());
-    }
+    println!("✅ kdapp authentication completed successfully!");
+    println!("🔍 Check your transactions on Kaspa explorer: https://explorer-tn10.kaspa.org/");
+    println!("📊 Look for AUTH transactions (0x41555448) from your address: {}", wallet.get_kaspa_address());
     
     Ok(())
 }
