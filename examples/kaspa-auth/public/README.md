@@ -23,7 +23,7 @@ public/
 
 1. Start the server:
    ```bash
-   cargo run -- http-server --port 8080
+   cargo run -- http-peer --port 8080
    ```
 
 2. Open your browser to:
