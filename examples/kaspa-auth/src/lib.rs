@@ -6,7 +6,6 @@ pub mod api;
 
 // Framework modules (re-enable anytime)
 pub mod cli;
-pub mod events;
 pub mod wallet;
 
 // Future modules (moved to future examples)

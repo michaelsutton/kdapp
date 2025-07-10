@@ -17,7 +17,7 @@ use crate::api::http::{
     },
     blockchain_engine::AuthHttpPeer,
 };
-use crate::api::websocket::organizer::websocket_handler;
+use crate::api::http::websocket::websocket_handler;
 use axum::Json;
 use serde_json::json;
 use kaspa_addresses::{Address, Prefix, Version};
@@ -178,6 +178,32 @@ async fn wallet_debug() -> Json<serde_json::Value> {
     Json(debug_info)
 }
 
+async fn episode_authenticated(
+    State(state): State<PeerState>,
+    Json(payload): Json<serde_json::Value>,
+) -> Json<serde_json::Value> {
+    let episode_id = payload["episode_id"].as_u64().unwrap_or(0);
+    let challenge = payload["challenge"].as_str().unwrap_or("");
+    
+    // Broadcast WebSocket message for authentication success
+    let ws_message = WebSocketMessage {
+        message_type: "authentication_successful".to_string(),
+        episode_id: Some(episode_id),
+        authenticated: Some(true),
+        challenge: Some(challenge.to_string()),
+        session_token: Some(format!("sess_{}", episode_id)),
+    };
+    
+    // Send to all connected WebSocket clients
+    let _ = state.websocket_tx.send(ws_message);
+    
+    Json(json!({
+        "status": "success",
+        "episode_id": episode_id,
+        "message": "Authentication notification sent"
+    }))
+}
+
 pub async fn run_http_peer(provided_private_key: Option<&str>, port: u16) -> Result<(), Box<dyn std::error::Error>> {
     let wallet = get_wallet_for_command("http-peer", provided_private_key)?;
     let keypair = wallet.keypair;
@@ -215,6 +241,7 @@ pub async fn run_http_peer(provided_private_key: Option<&str>, port: u16) -> Res
         .route("/auth/sign-challenge", post(sign_challenge))
         .route("/auth/verify", post(verify_auth))
         .route("/auth/status/{episode_id}", get(get_status))
+        .route("/internal/episode-authenticated", post(episode_authenticated))
         .fallback_service(ServeDir::new("public"))
         .with_state(peer_state)
         .layer(cors);
