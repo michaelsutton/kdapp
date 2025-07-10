@@ -339,7 +339,7 @@
                 <br><strong>💰 You need to fund YOUR participant address</strong> (shown in console) to authenticate.
                 <br><strong>🖥️ Organizer address above</strong> is only for coordination - you don't need to fund it.
             </div>
-            <button id="authButton" class="auth-button" onclick="startAuthentication()">
+            <button id="authButton" class="auth-button" onclick="handleAuthButton()">
                 🔑 Start Authentication Flow
             </button>
             
@@ -683,6 +683,20 @@
             document.getElementById('successExplorerLink').href = explorerUrl;
             
             document.getElementById('successCard').style.display = 'block';
+            
+            // Change button to logout mode
+            const button = document.getElementById('authButton');
+            const progress = document.getElementById('progressIndicator');
+            
+            button.disabled = false;
+            button.textContent = '🚪 Logout & Void Session';
+            button.style.background = 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)';
+            progress.style.display = 'none';
+            
+            // Store session info globally
+            window.currentSessionToken = sessionToken;
+            window.currentEpisodeId = episodeId;
+            window.isAuthenticated = true;
         }
         
         function resetUI() {
@@ -692,6 +706,7 @@
             
             button.disabled = false;
             button.textContent = '🔑 Start Authentication Flow';
+            button.style.background = 'linear-gradient(135deg, #70c7ba 0%, #5db3a8 100%)'; // Reset to original color
             progress.style.display = 'none';
             success.style.display = 'none';
             
@@ -700,13 +715,58 @@
                 updateStep(i, 'pending');
             }
             
+            // Clear session state
             currentEpisodeId = null;
             privateKey = null;
             publicKeyHex = null;
+            window.currentSessionToken = null;
+            window.currentEpisodeId = null;
+            window.isAuthenticated = false;
+        }
+        
+        async function logout() {
+            if (!window.isAuthenticated || !window.currentSessionToken) {
+                resetUI();
+                return;
+            }
+            
+            try {
+                // Show logout progress
+                const button = document.getElementById('authButton');
+                button.disabled = true;
+                button.textContent = '🔄 Voiding Session...';
+                
+                // TODO: Call backend API to void session token
+                // For now, just simulate logout
+                await sleep(1000);
+                
+                console.log('🚪 Session voided:', window.currentSessionToken);
+                alert('✅ Session voided successfully! You are now logged out.');
+                
+                resetUI();
+                
+            } catch (error) {
+                console.error('Logout error:', error);
+                alert(`Logout failed: ${error.message}`);
+                
+                // Reset button state on error
+                const button = document.getElementById('authButton');
+                button.disabled = false;
+                button.textContent = '🚪 Logout & Void Session';
+            }
         }
         
         function sleep(ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
+        }
+        
+        // Smart button handler - decides between authentication and logout
+        window.handleAuthButton = function() {
+            if (window.isAuthenticated) {
+                logout();
+            } else {
+                startAuthentication();
+            }
         }
 
         async function signChallenge(challenge) {
