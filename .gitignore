@@ -15,7 +15,3 @@ package-sizes.js
 
 # Local development files
 .claude/
-
-# Future example scaffolding - keep in dev branch only
-examples/kaspa-poker-tournament/
-examples/episode-contract/
