@@ -493,10 +493,7 @@
         }
         
         function handleWebSocketMessage(message) {
-            console.log('WebSocket message received:', message);
-            console.log('Message type:', message.type);
-            console.log('Current episode ID:', currentEpisodeId);
-            console.log('Message episode ID:', message.episode_id);
+            console.log('WebSocket message:', message);
             
             switch(message.type) {
                 case 'challenge_issued':
@@ -676,7 +673,6 @@
         }
         
         function showSuccess(sessionToken, episodeId, clientKaspaAddress) {
-            console.log('🎉 showSuccess called with:', { sessionToken, episodeId, clientKaspaAddress });
             document.getElementById('sessionToken').textContent = sessionToken;
             document.getElementById('episodeId').textContent = episodeId;
             document.getElementById('searchEpisodeId').textContent = episodeId;

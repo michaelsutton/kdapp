@@ -21,6 +21,7 @@ A **hybrid peer-to-peer authentication system** built on the Kaspa blockchain us
 - **Transaction confirmations** visible on Kaspa explorer
 - **Episode state synchronization** across all participants
 - **Immediate feedback** on authentication status
+- **Session management** with login/logout state and token voiding
 
 ## 🚀 Quick Start
 
@@ -42,6 +43,8 @@ A **hybrid peer-to-peer authentication system** built on the Kaspa blockchain us
    - **Fund YOUR participant address** (shown in console)
    - Complete challenge-response authentication
    - Watch real-time blockchain confirmations!
+   - **After success**: Button changes to "Logout & Void Session"
+   - **Click logout** to void session token and start fresh
 
 ### 💻 CLI Interface (Hybrid P2P)
 
