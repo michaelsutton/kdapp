@@ -53,7 +53,7 @@ async fn wallet_status() -> Json<serde_json::Value> {
             let kaspa_addr = Address::new(
                 Prefix::Testnet,
                 Version::PubKey,
-                &wallet.keypair.x_only_public_key().0.serialize()
+                &wallet.keypair.public_key().serialize()[1..]
             );
             
             Json(json!({
@@ -81,7 +81,7 @@ async fn wallet_client() -> Json<serde_json::Value> {
             let kaspa_addr = Address::new(
                 Prefix::Testnet,
                 Version::PubKey,
-                &wallet.keypair.x_only_public_key().0.serialize()
+                &wallet.keypair.public_key().serialize()[1..]
             );
             
             Json(json!({
@@ -156,7 +156,7 @@ async fn wallet_debug() -> Json<serde_json::Value> {
                 let kaspa_addr = Address::new(
                     Prefix::Testnet,
                     Version::PubKey,
-                    &wallet.keypair.x_only_public_key().0.serialize()
+                    &wallet.keypair.public_key().serialize()[1..]
                 );
                 
                 debug_info[command] = json!({
@@ -258,7 +258,7 @@ pub async fn run_http_peer(provided_private_key: Option<&str>, port: u16) -> Res
             let participant_addr = Address::new(
                 Prefix::Testnet,
                 Version::PubKey,
-                &wallet.keypair.x_only_public_key().0.serialize()
+                &wallet.keypair.public_key().serialize()[1..]
             );
             println!();
             println!("💰 PARTICIPANT WALLET FUNDING REQUIRED:");
