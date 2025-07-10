@@ -6,16 +6,18 @@ pub mod api;
 
 // Framework modules (re-enable anytime)
 pub mod cli;
-pub mod commitments;
-pub mod network;
-pub mod storage;
-pub mod time_bounded_auth;
-pub mod economics;
-pub mod state_management;
-pub mod oracle;
 pub mod events;
-pub mod examples;
 pub mod wallet;
+
+// Future modules (moved to future examples)
+// pub mod commitments;     // → kaspa-poker-tournament
+// pub mod economics;       // → kaspa-poker-tournament  
+// pub mod oracle;          // → episode-contract
+// pub mod time_bounded_auth; // → episode-contract
+// pub mod state_management; // → episode-contract
+// pub mod network;         // → future networking example
+// pub mod storage;         // → future storage example
+// pub mod examples;        // → individual example projects
 
 // Public API exports (only working functionality)
 pub use core::commands::AuthCommand;
