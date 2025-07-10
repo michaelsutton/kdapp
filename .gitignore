@@ -15,3 +15,7 @@ package-sizes.js
 
 # Local development files
 .claude/
+
+# Future examples - keep in dev branch only, hide from master
+examples/kaspa-poker-tournament/
+examples/episode-contract/
