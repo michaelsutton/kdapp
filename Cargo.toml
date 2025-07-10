@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["kdapp", "examples/tictactoe", "examples/kaspa-auth"]
+members = ["kdapp", "examples/tictactoe", "examples/kaspa-auth", "kaspa-poker-tournament", "episode-contract"]
 
 
 [workspace.package]
@@ -33,6 +33,7 @@ kaspa-consensus-core = { git = "https://github.com/kaspanet/rusty-kaspa.git", ta
 kaspa-hashes = { git = "https://github.com/kaspanet/rusty-kaspa.git", tag = "v1.0.0" }
 kaspa-addresses = { git = "https://github.com/kaspanet/rusty-kaspa.git", tag = "v1.0.0" }
 kaspa-txscript = { git = "https://github.com/kaspanet/rusty-kaspa.git", tag = "v1.0.0" }
+kaspa-bip32 = { git = "https://github.com/kaspanet/rusty-kaspa.git", tag = "v1.0.0" }
 
 borsh = { version = "1.5.1", features = ["derive", "rc"] }
 secp256k1 = { version = "0.29.0", features = [
