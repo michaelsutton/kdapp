@@ -1,0 +1,14 @@
+feat: Implement true P2P authentication and session management
+
+This commit refactors the kaspa-auth application to fully adhere to the kdapp philosophy, ensuring the blockchain is the single source of truth for all authentication and session management.
+
+Key changes include:
+- **Deterministic Challenge Generation:** Challenges are now deterministically generated using `rand_chacha` seeded with blockchain-derived timestamps, resolving previous "Challenge mismatch" errors.
+- **Deterministic Session Token Generation:** Session tokens are also deterministically generated, ensuring consistency across all peers and successful session revocation.
+- **Blockchain-Only Challenge Retrieval:** The client-side HTTP fallback for challenge retrieval has been removed, forcing reliance on the blockchain for all challenge coordination.
+- **Unified Episode State Management:** The `AuthEventHandler` has been refactored to remove its independent challenge state, ensuring the kdapp engine's episode state is the authoritative source.
+- **Updated Documentation:** `GEMINI.md` and `CLAUDE.md` have been updated with critical rules and insights gained during the debugging process, emphasizing the "no faking, no shortcuts, blockchain is truth" principle.
+
+This ensures a robust, truly decentralized authentication and session management system built on the Kaspa blockchain.
+
+Co-authored-by: Gemini <gemini@google.com>

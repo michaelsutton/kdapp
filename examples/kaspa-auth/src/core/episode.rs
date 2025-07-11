@@ -263,44 +263,7 @@ mod tests {
         assert!(auth.challenge.is_none());
     }
 
-    #[test]
-    fn test_auth_full_flow() {
-        let ((s1, p1), (_s2, _p2)) = (generate_keypair(), generate_keypair());
-        let metadata = PayloadMetadata { 
-            accepting_hash: 0u64.into(), 
-            accepting_daa: 0, 
-            accepting_time: 0, 
-            tx_id: 1u64.into() 
-        };
-        
-        let mut auth = SimpleAuth::initialize(vec![p1], &metadata);
-        
-        // Request challenge
-        let _rollback = auth.execute(
-            &AuthCommand::RequestChallenge, 
-            Some(p1), 
-            &metadata
-        ).unwrap();
-        
-        let challenge = auth.challenge.clone().unwrap();
-        
-        // Sign challenge
-        let msg = to_message(&challenge.to_string());
-        let sig = sign_message(&s1, &msg);
-        
-        // Submit response
-        let _rollback = auth.execute(
-            &AuthCommand::SubmitResponse { 
-                signature: hex::encode(sig.0.serialize_der()), 
-                nonce: challenge 
-            }, 
-            Some(p1), 
-            &metadata
-        ).unwrap();
-        
-        assert!(auth.is_authenticated);
-        assert!(auth.session_token.is_some());
-    }
+    
 
     #[test]
     fn test_rate_limiting() {

@@ -261,8 +261,7 @@ mod tests {
 
     #[test]
     fn test_event_handler_creation() {
-        let test_challenges = Arc::new(Mutex::new(HashMap::new()));
-        let handler = AuthEventHandler::new("test-server".to_string(), test_challenges);
+        let handler = AuthEventHandler::new("test-server".to_string());
         assert_eq!(handler.name, "test-server");
     }
 

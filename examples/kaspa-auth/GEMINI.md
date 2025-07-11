@@ -1,89 +1,3 @@
-[[[ Running `C:\Users\mariu\Documents\kdapp\kdapp\target\debug\kaspa-auth.exe authenticate --peer http://localhost:8080`
-📁 Loading participant-peer wallet from: .kaspa-auth\participant-peer-wallet.key
-📁 Loading wallet from: .kaspa-auth\participant-peer-wallet.key
-✅ Wallet loaded successfully
-🔑 Public Key: 031843dfb9c93cc821d45b297c6fced2413fbe26836cf578f035d3c89d4642bd10
-💰 Funding Address: kaspatest:qqvy8haeey7vsgw5tv5hcm7w6fqnl03xsdk0278sxhfu382xg273qmy7jzhqt
-🌐 Network: testnet-10
-
-🔄 REUSING existing participant-peer wallet
-🔑 Existing Kaspa address: kaspatest:qqvy8haeey7vsgw5tv5hcm7w6fqnl03xsdk0278sxhfu382xg273qmy7jzhqt
-📁 Loaded from: .kaspa-auth/participant-peer-wallet.key
-📁 Loading participant-peer wallet from: .kaspa-auth\participant-peer-wallet.key
-📁 Loading wallet from: .kaspa-auth\participant-peer-wallet.key
-✅ Wallet loaded successfully
-🔑 Public Key: 031843dfb9c93cc821d45b297c6fced2413fbe26836cf578f035d3c89d4642bd10
-💰 Funding Address: kaspatest:qqvy8haeey7vsgw5tv5hcm7w6fqnl03xsdk0278sxhfu382xg273qmy7jzhqt
-🌐 Network: testnet-10
-
-🔄 REUSING existing participant-peer wallet
-🔑 Existing Kaspa address: kaspatest:qqvy8haeey7vsgw5tv5hcm7w6fqnl03xsdk0278sxhfu382xg273qmy7jzhqt
-📁 Loaded from: .kaspa-auth/participant-peer-wallet.key
-🔐 Running focused authentication test (30s timeout)
-🚀 Starting hybrid authentication (kdapp + HTTP coordination)
-🎯 Organizer peer: http://localhost:8080
-🔥 Starting focused authentication test (30s timeout)
-📁 Loading participant-peer wallet from: .kaspa-auth\participant-peer-wallet.key
-📁 Loading wallet from: .kaspa-auth\participant-peer-wallet.key
-✅ Wallet loaded successfully
-🔑 Public Key: 031843dfb9c93cc821d45b297c6fced2413fbe26836cf578f035d3c89d4642bd10
-💰 Funding Address: kaspatest:qqvy8haeey7vsgw5tv5hcm7w6fqnl03xsdk0278sxhfu382xg273qmy7jzhqt
-🌐 Network: testnet-10
-
-🔄 REUSING existing participant-peer wallet
-🔑 Existing Kaspa address: kaspatest:qqvy8haeey7vsgw5tv5hcm7w6fqnl03xsdk0278sxhfu382xg273qmy7jzhqt
-📁 Loaded from: .kaspa-auth/participant-peer-wallet.key
-🌐 Using HTTP coordination: http://localhost:8080
-🔑 Auth public key: 031843dfb9c93cc821d45b297c6fced2413fbe26836cf578f035d3c89d4642bd10
-📡 Connecting to testnet-10 blockchain...
-2025-07-11T15:33:30.384957Z  INFO kdapp::proxy: Connected to Kaspad wss://quark-10.kaspa.red/kaspa/testnet-10/wrpc/borsh, version: 1.0.0, network: testnet-10    
-💰 Kaspa address: kaspatest:qqvy8haeey7vsgw5tv5hcm7w6fqnl03xsdk0278sxhfu382xg273qmy7jzhqt
-🔍 Fetching UTXOs...
-✅ UTXO found: (585366f5e90a225d4a92c0911c0570e8f1f83cc5b0f661d5b19d543ae73f3247, 0)
-🚀 Initializing authentication episode...
-🚀 Submitting NewEpisode transaction: 10efcf1fa380ad65a1a71443fc581dcc822dcb54be95dec156c7d44a7f6ac9d5
-✅ Episode 2458082978 initialized on blockchain!
-📨 Sending RequestChallenge command to blockchain...
-🚀 Submitting RequestChallenge transaction: 07bf1109ab9d0338b3bedee44d3ff167e79001e02011e988c2b3f463207cf04c
-✅ RequestChallenge transaction submitted to blockchain!
-⏳ Waiting for challenge response from auth server...
-2025-07-11T15:33:31.244943Z  INFO kdapp::proxy: Connected to Kaspad wss://photon-10.kaspa.red/kaspa/testnet-10/wrpc/borsh, version: 1.0.1, network: testnet-10    
-👂 Listening for episode state updates...
-🔍 Looking for episode ID: 2458082978
-2025-07-11T15:33:31.285914Z  INFO kdapp::proxy: Sink: c88d31b1bbe10e57486fe98bf2af59ecf51a86b6a061ca2760a583862b7c54f5    
-⏰ Still listening... attempt 10 of 20
-⏰ Still listening... attempt 20 of 20
-⚠️ Timeout waiting for challenge from blockchain. Falling back to HTTP coordination...
-📝 Registering episode 2458082978 with HTTP organizer...
-2025-07-11T15:33:33.474262Z  INFO kdapp::proxy: received episode tx: 10efcf1fa380ad65a1a71443fc581dcc822dcb54be95dec156c7d44a7f6ac9d5    
-2025-07-11T15:33:33.474936Z  INFO kaspa_auth::core::episode: [SimpleAuth] initialize: [PublicKey(10bd42469dc8d335f078f56c8326be3f41d2ce6f7c295bd421c83cc9b9df4318ad232a8ef81fe3aa3a9aaf15cbd25eaee71eddfb532168735c829187b89851cf)]
-🔍 CLIENT: Episode 2458082978 initialized - challenge: None
-2025-07-11T15:33:33.596909Z  INFO kdapp::proxy: received episode tx: 07bf1109ab9d0338b3bedee44d3ff167e79001e02011e988c2b3f463207cf04c    
-2025-07-11T15:33:33.598118Z  INFO kaspa_auth::core::episode: [SimpleAuth] RequestChallenge from: PublicKey(10bd42469dc8d335f078f56c8326be3f41d2ce6f7c295bd421c83cc9b9df4318ad232a8ef81fe3aa3a9aaf15cbd25eaee71eddfb532168735c829187b89851cf)
-🔍 CLIENT: Episode 2458082978 command RequestChallenge - challenge: Some("auth_1752248013_3833815621535429167")
-✅ Episode registered with HTTP organizer
-🔄 HTTP coordination attempt 1 of 5...
-📡 HTTP status response: {"authenticated":false,"blockchain_confirmed":true,"challenge":"auth_1752248013_492642567692848515","episode_id":2458082978,"public_key":"031843dfb9c93cc821d45b297c6fced2413fbe26836cf578f035d3c89d4642bd10","session_token":null,"source":"real_blockchain_state","status":"pending"}
-🎯 Challenge retrieved via HTTP status: auth_1752248013_492642567692848515
-✍️ Signing challenge...
-📤 Sending SubmitResponse command to blockchain...
-🚀 Submitting SubmitResponse transaction: 79fe87487d45b2fafb1efb41ec30796ba5814fd00f7c2602e9bf635413c062bc
-✅ Authentication commands submitted to Kaspa blockchain!
-🎯 Real kdapp architecture: Generator → Proxy → Engine → Episode
-📊 Transactions are now being processed by auth server's kdapp engine
-⏳ Waiting for authentication completion to retrieve session token...
-2025-07-11T15:33:34.471578Z  INFO kdapp::proxy: received episode tx: 79fe87487d45b2fafb1efb41ec30796ba5814fd00f7c2602e9bf635413c062bc    
-2025-07-11T15:33:34.474986Z  INFO kaspa_auth::core::episode: [SimpleAuth] SubmitResponse from: PublicKey(10bd42469dc8d335f078f56c8326be3f41d2ce6f7c295bd421c83cc9b9df4318ad232a8ef81fe3aa3a9aaf15cbd25eaee71eddfb532168735c829187b89851cf)
-2025-07-11T15:33:34.475793Z  INFO kaspa_auth::core::episode: [SimpleAuth] Challenge mismatch - received: 'auth_1752248013_492642567692848515', expected: 'auth_1752248013_3833815621535429167'
-2025-07-11T15:33:34.476329Z  WARN kdapp::engine: Episode 2458082978: Command SubmitResponse { signature: "3045022100efb73ca3bfabf3d3d97d914b710d094a35b005669d85d1dd6b2d8be4e1605d81022052a8a6464f3e04d1e99ca207a642994641c768c82918031eee4e424bf5433de1", nonce: "auth_1752248013_492642567692848515" } rejected: invalid command: Invalid or expired challenge.
-2025-07-11T15:33:35.491957Z  INFO kdapp::proxy: received episode tx: 79fe87487d45b2fafb1efb41ec30796ba5814fd00f7c2602e9bf635413c062bc    
-2025-07-11T15:33:35.493501Z  INFO kaspa_auth::core::episode: [SimpleAuth] SubmitResponse from: PublicKey(10bd42469dc8d335f078f56c8326be3f41d2ce6f7c295bd421c83cc9b9df4318ad232a8ef81fe3aa3a9aaf15cbd25eaee71eddfb532168735c829187b89851cf)
-2025-07-11T15:33:35.493885Z  INFO kaspa_auth::core::episode: [SimpleAuth] Challenge mismatch - received: 'auth_1752248013_492642567692848515', expected: 'auth_1752248013_3833815621535429167'
-2025-07-11T15:33:35.494191Z  WARN kdapp::engine: Episode 2458082978: Command SubmitResponse { signature: "3045022100efb73ca3bfabf3d3d97d914b710d094a35b005669d85d1dd6b2d8be4e1605d81022052a8a6464f3e04d1e99ca207a642994641c768c82918031eee4e424bf5433de1", nonce: "auth_1752248013_492642567692848515" } rejected: invalid command: Invalid or expired challenge.
-❌ Authentication failed: ❌ AUTHENTICATION FAILED: Could not retrieve session token from blockchain. Authentication incomplete.
-Error: "❌ AUTHENTICATION FAILED: Could not retrieve session token from blockchain. Authentication incomplete."
-error: process didn't exit successfully: `C:\Users\mariu\Documents\kdapp\kdapp\target\debug\kaspa-auth.exe authenticate --peer http://localhost:8080` (exit code: 1)]]]
-
 # 🎉 Kaspa Authentication - True P2P System Success!
 
 ## 🏆 REVOLUTIONARY ACHIEVEMENT
@@ -556,6 +470,54 @@ The CLI (`cargo run -- authenticate`) works because it:
 4. **Uses blockchain as source of truth** - not memory
 
 ## 🎯 URGENT ROADMAP: Fix HTTP to Use Real kdapp Architecture
+
+## 🚨 CRITICAL: Deterministic Challenge & Session Token Generation
+
+### The Problem: Non-Deterministic Randomness
+
+Previously, challenges and session tokens were generated using `rand::thread_rng()`. While cryptographically secure, this method is **non-deterministic**. This means that even with the same input parameters, different instances of the `kdapp` engine (or the same instance at different times) would produce different "random" outputs.
+
+This led to critical issues:
+- **Challenge Mismatch**: The challenge generated by the organizer peer (and stored on the blockchain) would not match the challenge the participant peer expected when trying to sign it, resulting in `Invalid or expired challenge` errors.
+- **Session Token Mismatch**: The session token generated during authentication would not match the token expected during session revocation, leading to `Invalid or malformed session token` errors.
+
+### The Solution: Deterministic Seeding
+
+To ensure consistency and verifiability across all peers, challenges and session tokens must be deterministically generated. This is achieved by:
+- Using `rand_chacha::ChaCha8Rng`, a cryptographically secure pseudorandom number generator.
+- Seeding the `ChaCha8Rng` with a **blockchain-derived timestamp** (`metadata.accepting_time`). This timestamp is part of the transaction metadata and is consistent across all peers processing the same transaction.
+
+**This ensures that given the same blockchain transaction (and thus the same `metadata.accepting_time`), every `kdapp` engine will deterministically generate the exact same challenge and session token.**
+
+### Key Principles:
+- **Blockchain is the Seed**: All randomness for critical protocol elements (challenges, session tokens) must be derived from deterministic, blockchain-verified data.
+- **Reproducibility**: Any peer, by replaying the blockchain history, must be able to reproduce the exact same challenge and session token at any point in time.
+- **No `thread_rng()` for Protocol Elements**: Avoid `thread_rng()` for any data that needs to be consistent across the distributed system.
+
+### Example (Fixed):
+```rust
+// src/crypto/challenges.rs
+pub fn generate_with_provided_timestamp(timestamp: u64) -> String {
+    use rand_chacha::ChaCha8Rng;
+    use rand::SeedableRng;
+    use rand::Rng; // Required for .gen()
+    let mut rng = ChaCha8Rng::seed_from_u64(timestamp);
+    format!("auth_{}_{}", timestamp, rng.gen::<u64>())
+}
+
+// src/core/episode.rs
+fn generate_session_token(&self) -> String {
+    use rand_chacha::ChaCha8Rng;
+    use rand::SeedableRng;
+    use rand::Rng; // Required for .gen()
+    let mut rng = ChaCha8Rng::seed_from_u64(self.challenge_timestamp);
+    format!("sess_{}", rng.gen::<u64>())
+}
+```
+
+This deterministic approach is fundamental to the `kdapp` philosophy, ensuring that all critical state transitions are verifiable and consistent across the entire peer-to-peer network.
+
+
 
 ### Phase 1: HTTP Organizer Peer Must Run kdapp Engine (1-2 days)
 
