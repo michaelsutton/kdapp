@@ -1,3 +1,89 @@
+[[[ Running `C:\Users\mariu\Documents\kdapp\kdapp\target\debug\kaspa-auth.exe authenticate --peer http://localhost:8080`
+📁 Loading participant-peer wallet from: .kaspa-auth\participant-peer-wallet.key
+📁 Loading wallet from: .kaspa-auth\participant-peer-wallet.key
+✅ Wallet loaded successfully
+🔑 Public Key: 031843dfb9c93cc821d45b297c6fced2413fbe26836cf578f035d3c89d4642bd10
+💰 Funding Address: kaspatest:qqvy8haeey7vsgw5tv5hcm7w6fqnl03xsdk0278sxhfu382xg273qmy7jzhqt
+🌐 Network: testnet-10
+
+🔄 REUSING existing participant-peer wallet
+🔑 Existing Kaspa address: kaspatest:qqvy8haeey7vsgw5tv5hcm7w6fqnl03xsdk0278sxhfu382xg273qmy7jzhqt
+📁 Loaded from: .kaspa-auth/participant-peer-wallet.key
+📁 Loading participant-peer wallet from: .kaspa-auth\participant-peer-wallet.key
+📁 Loading wallet from: .kaspa-auth\participant-peer-wallet.key
+✅ Wallet loaded successfully
+🔑 Public Key: 031843dfb9c93cc821d45b297c6fced2413fbe26836cf578f035d3c89d4642bd10
+💰 Funding Address: kaspatest:qqvy8haeey7vsgw5tv5hcm7w6fqnl03xsdk0278sxhfu382xg273qmy7jzhqt
+🌐 Network: testnet-10
+
+🔄 REUSING existing participant-peer wallet
+🔑 Existing Kaspa address: kaspatest:qqvy8haeey7vsgw5tv5hcm7w6fqnl03xsdk0278sxhfu382xg273qmy7jzhqt
+📁 Loaded from: .kaspa-auth/participant-peer-wallet.key
+🔐 Running focused authentication test (30s timeout)
+🚀 Starting hybrid authentication (kdapp + HTTP coordination)
+🎯 Organizer peer: http://localhost:8080
+🔥 Starting focused authentication test (30s timeout)
+📁 Loading participant-peer wallet from: .kaspa-auth\participant-peer-wallet.key
+📁 Loading wallet from: .kaspa-auth\participant-peer-wallet.key
+✅ Wallet loaded successfully
+🔑 Public Key: 031843dfb9c93cc821d45b297c6fced2413fbe26836cf578f035d3c89d4642bd10
+💰 Funding Address: kaspatest:qqvy8haeey7vsgw5tv5hcm7w6fqnl03xsdk0278sxhfu382xg273qmy7jzhqt
+🌐 Network: testnet-10
+
+🔄 REUSING existing participant-peer wallet
+🔑 Existing Kaspa address: kaspatest:qqvy8haeey7vsgw5tv5hcm7w6fqnl03xsdk0278sxhfu382xg273qmy7jzhqt
+📁 Loaded from: .kaspa-auth/participant-peer-wallet.key
+🌐 Using HTTP coordination: http://localhost:8080
+🔑 Auth public key: 031843dfb9c93cc821d45b297c6fced2413fbe26836cf578f035d3c89d4642bd10
+📡 Connecting to testnet-10 blockchain...
+2025-07-11T15:33:30.384957Z  INFO kdapp::proxy: Connected to Kaspad wss://quark-10.kaspa.red/kaspa/testnet-10/wrpc/borsh, version: 1.0.0, network: testnet-10    
+💰 Kaspa address: kaspatest:qqvy8haeey7vsgw5tv5hcm7w6fqnl03xsdk0278sxhfu382xg273qmy7jzhqt
+🔍 Fetching UTXOs...
+✅ UTXO found: (585366f5e90a225d4a92c0911c0570e8f1f83cc5b0f661d5b19d543ae73f3247, 0)
+🚀 Initializing authentication episode...
+🚀 Submitting NewEpisode transaction: 10efcf1fa380ad65a1a71443fc581dcc822dcb54be95dec156c7d44a7f6ac9d5
+✅ Episode 2458082978 initialized on blockchain!
+📨 Sending RequestChallenge command to blockchain...
+🚀 Submitting RequestChallenge transaction: 07bf1109ab9d0338b3bedee44d3ff167e79001e02011e988c2b3f463207cf04c
+✅ RequestChallenge transaction submitted to blockchain!
+⏳ Waiting for challenge response from auth server...
+2025-07-11T15:33:31.244943Z  INFO kdapp::proxy: Connected to Kaspad wss://photon-10.kaspa.red/kaspa/testnet-10/wrpc/borsh, version: 1.0.1, network: testnet-10    
+👂 Listening for episode state updates...
+🔍 Looking for episode ID: 2458082978
+2025-07-11T15:33:31.285914Z  INFO kdapp::proxy: Sink: c88d31b1bbe10e57486fe98bf2af59ecf51a86b6a061ca2760a583862b7c54f5    
+⏰ Still listening... attempt 10 of 20
+⏰ Still listening... attempt 20 of 20
+⚠️ Timeout waiting for challenge from blockchain. Falling back to HTTP coordination...
+📝 Registering episode 2458082978 with HTTP organizer...
+2025-07-11T15:33:33.474262Z  INFO kdapp::proxy: received episode tx: 10efcf1fa380ad65a1a71443fc581dcc822dcb54be95dec156c7d44a7f6ac9d5    
+2025-07-11T15:33:33.474936Z  INFO kaspa_auth::core::episode: [SimpleAuth] initialize: [PublicKey(10bd42469dc8d335f078f56c8326be3f41d2ce6f7c295bd421c83cc9b9df4318ad232a8ef81fe3aa3a9aaf15cbd25eaee71eddfb532168735c829187b89851cf)]
+🔍 CLIENT: Episode 2458082978 initialized - challenge: None
+2025-07-11T15:33:33.596909Z  INFO kdapp::proxy: received episode tx: 07bf1109ab9d0338b3bedee44d3ff167e79001e02011e988c2b3f463207cf04c    
+2025-07-11T15:33:33.598118Z  INFO kaspa_auth::core::episode: [SimpleAuth] RequestChallenge from: PublicKey(10bd42469dc8d335f078f56c8326be3f41d2ce6f7c295bd421c83cc9b9df4318ad232a8ef81fe3aa3a9aaf15cbd25eaee71eddfb532168735c829187b89851cf)
+🔍 CLIENT: Episode 2458082978 command RequestChallenge - challenge: Some("auth_1752248013_3833815621535429167")
+✅ Episode registered with HTTP organizer
+🔄 HTTP coordination attempt 1 of 5...
+📡 HTTP status response: {"authenticated":false,"blockchain_confirmed":true,"challenge":"auth_1752248013_492642567692848515","episode_id":2458082978,"public_key":"031843dfb9c93cc821d45b297c6fced2413fbe26836cf578f035d3c89d4642bd10","session_token":null,"source":"real_blockchain_state","status":"pending"}
+🎯 Challenge retrieved via HTTP status: auth_1752248013_492642567692848515
+✍️ Signing challenge...
+📤 Sending SubmitResponse command to blockchain...
+🚀 Submitting SubmitResponse transaction: 79fe87487d45b2fafb1efb41ec30796ba5814fd00f7c2602e9bf635413c062bc
+✅ Authentication commands submitted to Kaspa blockchain!
+🎯 Real kdapp architecture: Generator → Proxy → Engine → Episode
+📊 Transactions are now being processed by auth server's kdapp engine
+⏳ Waiting for authentication completion to retrieve session token...
+2025-07-11T15:33:34.471578Z  INFO kdapp::proxy: received episode tx: 79fe87487d45b2fafb1efb41ec30796ba5814fd00f7c2602e9bf635413c062bc    
+2025-07-11T15:33:34.474986Z  INFO kaspa_auth::core::episode: [SimpleAuth] SubmitResponse from: PublicKey(10bd42469dc8d335f078f56c8326be3f41d2ce6f7c295bd421c83cc9b9df4318ad232a8ef81fe3aa3a9aaf15cbd25eaee71eddfb532168735c829187b89851cf)
+2025-07-11T15:33:34.475793Z  INFO kaspa_auth::core::episode: [SimpleAuth] Challenge mismatch - received: 'auth_1752248013_492642567692848515', expected: 'auth_1752248013_3833815621535429167'
+2025-07-11T15:33:34.476329Z  WARN kdapp::engine: Episode 2458082978: Command SubmitResponse { signature: "3045022100efb73ca3bfabf3d3d97d914b710d094a35b005669d85d1dd6b2d8be4e1605d81022052a8a6464f3e04d1e99ca207a642994641c768c82918031eee4e424bf5433de1", nonce: "auth_1752248013_492642567692848515" } rejected: invalid command: Invalid or expired challenge.
+2025-07-11T15:33:35.491957Z  INFO kdapp::proxy: received episode tx: 79fe87487d45b2fafb1efb41ec30796ba5814fd00f7c2602e9bf635413c062bc    
+2025-07-11T15:33:35.493501Z  INFO kaspa_auth::core::episode: [SimpleAuth] SubmitResponse from: PublicKey(10bd42469dc8d335f078f56c8326be3f41d2ce6f7c295bd421c83cc9b9df4318ad232a8ef81fe3aa3a9aaf15cbd25eaee71eddfb532168735c829187b89851cf)
+2025-07-11T15:33:35.493885Z  INFO kaspa_auth::core::episode: [SimpleAuth] Challenge mismatch - received: 'auth_1752248013_492642567692848515', expected: 'auth_1752248013_3833815621535429167'
+2025-07-11T15:33:35.494191Z  WARN kdapp::engine: Episode 2458082978: Command SubmitResponse { signature: "3045022100efb73ca3bfabf3d3d97d914b710d094a35b005669d85d1dd6b2d8be4e1605d81022052a8a6464f3e04d1e99ca207a642994641c768c82918031eee4e424bf5433de1", nonce: "auth_1752248013_492642567692848515" } rejected: invalid command: Invalid or expired challenge.
+❌ Authentication failed: ❌ AUTHENTICATION FAILED: Could not retrieve session token from blockchain. Authentication incomplete.
+Error: "❌ AUTHENTICATION FAILED: Could not retrieve session token from blockchain. Authentication incomplete."
+error: process didn't exit successfully: `C:\Users\mariu\Documents\kdapp\kdapp\target\debug\kaspa-auth.exe authenticate --peer http://localhost:8080` (exit code: 1)]]]
+
 # 🎉 Kaspa Authentication - True P2P System Success!
 
 ## 🏆 REVOLUTIONARY ACHIEVEMENT
@@ -23,6 +109,110 @@ We have successfully built a **true peer-to-peer authentication system** that re
 - **Transaction confirmations** visible on Kaspa explorer
 - **Episode state synchronization** across all participants
 - **Immediate feedback** on authentication status
+
+## 🚨 CRITICAL: Working Directory Rule - #1 Confusion Source!
+
+### ❌ WRONG: Running from Root Directory
+```bash
+# DON'T RUN FROM HERE:
+/kdapp/$ cargo run --bin kaspa-auth -- http-peer
+# ERROR: "no bin target named kaspa-auth"
+```
+
+### ✅ CORRECT: Always Run from examples/kaspa-auth/
+```bash
+# ALWAYS RUN FROM HERE:
+/kdapp/examples/kaspa-auth/$ cargo run --bin kaspa-auth -- http-peer
+# SUCCESS: HTTP peer starts correctly!
+```
+
+### 🔥 Why This is THE #1 Issue
+**FUNDAMENTAL RULE**: ALL kaspa-auth commands MUST be run from the `examples/kaspa-auth/` directory!
+
+**The Problem**:
+- **kdapp root** contains the framework workspace
+- **examples/kaspa-auth/** contains the auth implementation binary
+- Cargo searches current workspace for binaries
+- Wrong directory = confusing "binary not found" errors
+
+### 🎯 Quick Fix
+```bash
+# 1. Check where you are:
+pwd
+
+# 2. If NOT in examples/kaspa-auth/, navigate there:
+cd examples/kaspa-auth/  # From kdapp root
+# OR
+cd /full/path/to/kdapp/examples/kaspa-auth/  # From anywhere
+
+# 3. Now all commands work:
+cargo run --bin kaspa-auth -- wallet-status ✅
+cargo run --bin kaspa-auth -- http-peer --port 8080 ✅
+```
+
+### 💡 Pro Tips
+1. **Pin a terminal tab** to `examples/kaspa-auth/` directory
+2. **Always verify** with `pwd` before running commands
+3. **Bookmark** the correct directory in your file manager
+
+## 🚫 NO PREMATURE CELEBRATION RULE
+
+### ❌ WRONG: Celebrating Before Commit
+- "🎉 SUCCESS!" before git commit
+- "✅ COMPLETE!" before testing
+- "🏆 ACHIEVEMENT!" before verification
+- Excessive celebration language wastes tokens
+
+### ✅ CORRECT: Professional Development Workflow
+- Test functionality
+- Fix any issues  
+- Commit changes
+- Brief acknowledgment only
+
+**RULE**: No celebration emojis or extensive success language until work is committed and verified. Keep responses focused and token-efficient.
+
+## 🔑 CRITICAL: Wallet Persistence Architecture
+
+### 🚨 THE PERSISTENT WALLET PRINCIPLE
+**FUNDAMENTAL RULE**: Once a wallet is created for a peer role, it MUST be reused across ALL sessions and feature additions.
+
+**Why This Matters**:
+- **Identity Consistency**: Same peer = same public key across all sessions
+- **Address Stability**: Kaspa addresses never change between runs
+- **Episode Continuity**: Blockchain recognizes the same participant
+- **UTXO Accumulation**: Funds stay in consistent addresses
+- **User Experience**: No confusion about multiple identities
+
+### 📁 Required File Structure
+```
+.kaspa-auth/
+├── organizer-peer-wallet.key     # HTTP Organizer Peer persistent identity
+└── participant-peer-wallet.key   # CLI/Web Participant persistent identity
+```
+
+### ✅ Implementation Requirements
+1. **Separate wallet files** per peer role (organizer vs participant)
+2. **Persistent storage** in `.kaspa-auth/` directory
+3. **Clear user messaging** about wallet reuse vs creation
+4. **First-run detection** with funding guidance
+5. **Address stability** across all feature additions
+
+### ❌ Common Mistake to Avoid
+```rust
+// WRONG: Creates new wallets every time
+let wallet = generate_random_keypair(); // DON'T DO THIS!
+
+// CORRECT: Reuses existing wallets
+let wallet = get_wallet_for_command("organizer-peer", None)?; // DO THIS!
+```
+
+### 💡 Best Practice Messaging
+```
+✅ GOOD: "🔑 Using existing organizer-peer wallet (kaspatest:xyz...)"
+❌ BAD:  "🔑 Wallet loaded" (ambiguous about reuse vs creation)
+```
+
+This wallet persistence rule is **critical for kdapp architecture** - breaking it causes identity confusion and breaks the P2P model!
 
 ## 🚀 Quick Start Guide
 

@@ -7,6 +7,13 @@ use kaspa_addresses;
 use serde_json;
 use reqwest;
 
+#[derive(Debug, Clone)]
+struct AuthenticationResult {
+    episode_id: u64,
+    session_token: String,
+    authenticated: bool,
+}
+
 use kaspa_auth::core::episode::SimpleAuth;
 use kaspa_auth::core::commands::AuthCommand;
 use kaspa_auth::{AuthServerConfig, run_auth_server};
@@ -60,7 +67,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         )
         .subcommand(
             Command::new("authenticate")
-                .about("🚀 One-command authentication (kdapp + HTTP coordination)")
+                .about("🔐 Authentication testing only (focused, with timeout)")
                 .arg(
                     Arg::new("key")
                         .short('k')
@@ -84,10 +91,148 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         .default_value("http://127.0.0.1:8080")
                 )
                 .arg(
+                    Arg::new("timeout")
+                        .short('t')
+                        .long("timeout")
+                        .value_name("SECONDS")
+                        .help("Timeout for authentication completion")
+                        .default_value("30")
+                )
+                .arg(
                     Arg::new("pure-kdapp")
                         .long("pure-kdapp")
                         .help("Use pure kdapp without HTTP coordination (experimental)")
                         .action(clap::ArgAction::SetTrue)
+                )
+        )
+        .subcommand(
+            Command::new("authenticate-full-flow")
+                .about("🔄 Complete login → session → logout cycle with timeouts")
+                .arg(
+                    Arg::new("key")
+                        .short('k')
+                        .long("key")
+                        .value_name("PRIVATE_KEY")
+                        .help("Private key (hex format) - generates random if not provided")
+                )
+                .arg(
+                    Arg::new("keyfile")
+                        .short('f')
+                        .long("keyfile")
+                        .value_name("FILE")
+                        .help("Load private key from file (safer than --key)")
+                )
+                .arg(
+                    Arg::new("peer")
+                        .short('p')
+                        .long("peer")
+                        .value_name("URL")
+                        .help("HTTP organizer peer URL for coordination")
+                        .default_value("http://127.0.0.1:8080")
+                )
+                .arg(
+                    Arg::new("session-duration")
+                        .short('s')
+                        .long("session-duration")
+                        .value_name("SECONDS")
+                        .help("How long to wait between login and logout")
+                        .default_value("10")
+                )
+                .arg(
+                    Arg::new("auth-timeout")
+                        .short('t')
+                        .long("auth-timeout")
+                        .value_name("SECONDS")
+                        .help("Timeout for authentication steps")
+                        .default_value("30")
+                )
+        )
+        .subcommand(
+            Command::new("logout")
+                .about("🚪 Logout testing only (requires active session)")
+                .arg(
+                    Arg::new("episode-id")
+                        .short('e')
+                        .long("episode-id")
+                        .value_name("EPISODE_ID")
+                        .help("Episode ID of the session to logout from")
+                        .required(true)
+                )
+                .arg(
+                    Arg::new("session-token")
+                        .short('s')
+                        .long("session-token")
+                        .value_name("SESSION_TOKEN")
+                        .help("Session token to logout")
+                        .required(true)
+                )
+                .arg(
+                    Arg::new("key")
+                        .short('k')
+                        .long("key")
+                        .value_name("PRIVATE_KEY")
+                        .help("Private key (hex format) - uses participant wallet if not provided")
+                )
+                .arg(
+                    Arg::new("peer")
+                        .long("peer")
+                        .value_name("PEER_ADDRESS")
+                        .help("HTTP organizer peer address")
+                        .default_value("http://localhost:8080")
+                )
+                .arg(
+                    Arg::new("timeout")
+                        .short('t')
+                        .long("timeout")
+                        .value_name("SECONDS")
+                        .help("Timeout for logout completion")
+                        .default_value("15")
+                )
+        )
+        .subcommand(
+            Command::new("revoke-session")
+                .about("🔄 Revoke an active session on the blockchain")
+                .arg(
+                    Arg::new("episode-id")
+                        .short('e')
+                        .long("episode-id")
+                        .value_name("EPISODE_ID")
+                        .help("Episode ID of the session to revoke")
+                        .required(true)
+                )
+                .arg(
+                    Arg::new("session-token")
+                        .short('s')
+                        .long("session-token")
+                        .value_name("SESSION_TOKEN")
+                        .help("Session token to revoke")
+                        .required(true)
+                )
+                .arg(
+                    Arg::new("key")
+                        .short('k')
+                        .long("key")
+                        .value_name("PRIVATE_KEY")
+                        .help("Private key (hex format) - uses participant wallet if not provided")
+                )
+                .arg(
+                    Arg::new("peer")
+                        .long("peer")
+                        .value_name("PEER_ADDRESS")
+                        .help("HTTP organizer peer address")
+                        .default_value("http://localhost:8080")
+                )
+        )
+        .subcommand(
+            Command::new("wallet-status")
+                .about("🔍 Show wallet status and addresses")
+                .arg(
+                    Arg::new("role")
+                        .short('r')
+                        .long("role")
+                        .value_name("ROLE")
+                        .help("Check specific role wallet (organizer-peer, participant-peer, or all)")
+                        .default_value("all")
                 )
         )
         .subcommand(
@@ -219,6 +364,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Some(("authenticate", sub_matches)) => {
             let peer_url = sub_matches.get_one::<String>("peer").unwrap().clone();
             let use_pure_kdapp = sub_matches.get_flag("pure-kdapp");
+            let timeout_seconds: u64 = sub_matches.get_one::<String>("timeout").unwrap().parse()
+                .map_err(|_| "Invalid timeout value")?;
             
             // Get private key using unified wallet system
             let auth_keypair = if let Some(keyfile_path) = sub_matches.get_one::<String>("keyfile") {
@@ -233,16 +380,101 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let funding_wallet = get_wallet_for_command("participant-peer", None)?;
             let funding_keypair = funding_wallet.keypair;
             
+            println!("🔐 Running focused authentication test ({}s timeout)", timeout_seconds);
+            
             if use_pure_kdapp {
                 println!("🚀 Starting pure kdapp authentication (experimental)");
                 println!("⚡ No HTTP coordination - pure peer-to-peer via Kaspa blockchain");
-                run_automatic_authentication(auth_keypair).await?;
+                run_authentication_with_timeout(auth_keypair, None, timeout_seconds).await?;
             } else {
                 println!("🚀 Starting hybrid authentication (kdapp + HTTP coordination)");
                 println!("🎯 Organizer peer: {}", peer_url);
-                println!("💡 Use --pure-kdapp for experimental blockchain-only mode");
-                run_http_coordinated_authentication(funding_keypair, auth_keypair, peer_url).await?;
+                run_authentication_with_timeout(funding_keypair, Some(peer_url), timeout_seconds).await?;
             }
+        }
+        Some(("authenticate-full-flow", sub_matches)) => {
+            let peer_url = sub_matches.get_one::<String>("peer").unwrap().clone();
+            let session_duration: u64 = sub_matches.get_one::<String>("session-duration").unwrap().parse()
+                .map_err(|_| "Invalid session duration value")?;
+            let auth_timeout: u64 = sub_matches.get_one::<String>("auth-timeout").unwrap().parse()
+                .map_err(|_| "Invalid auth timeout value")?;
+            
+            // Get private key using unified wallet system
+            let auth_keypair = if let Some(keyfile_path) = sub_matches.get_one::<String>("keyfile") {
+                load_private_key_from_file(keyfile_path)?
+            } else {
+                let provided_private_key = sub_matches.get_one::<String>("key").map(|s| s.as_str());
+                let wallet = get_wallet_for_command("authenticate", provided_private_key)?;
+                wallet.keypair
+            };
+
+            // Get funding keypair for transactions
+            let funding_wallet = get_wallet_for_command("participant-peer", None)?;
+            let funding_keypair = funding_wallet.keypair;
+            
+            println!("🔄 Running complete authentication lifecycle test");
+            println!("⏱️  Auth timeout: {}s, Session duration: {}s", auth_timeout, session_duration);
+            println!("🎯 Organizer peer: {}", peer_url);
+            
+            run_full_authentication_cycle(funding_keypair, auth_keypair, peer_url, session_duration, auth_timeout).await?;
+        }
+        Some(("logout", sub_matches)) => {
+            let episode_id: u64 = sub_matches
+                .get_one::<String>("episode-id")
+                .unwrap()
+                .parse()
+                .map_err(|_| "Invalid episode ID")?;
+            
+            let session_token = sub_matches
+                .get_one::<String>("session-token")
+                .unwrap()
+                .clone();
+            
+            let peer_url = sub_matches.get_one::<String>("peer").unwrap().clone();
+            let timeout_seconds: u64 = sub_matches.get_one::<String>("timeout").unwrap().parse()
+                .map_err(|_| "Invalid timeout value")?;
+            
+            // Get private key using unified wallet system
+            let auth_keypair = if let Some(provided_private_key) = sub_matches.get_one::<String>("key") {
+                parse_private_key(provided_private_key)?
+            } else {
+                let wallet = get_wallet_for_command("participant-peer", None)?;
+                wallet.keypair
+            };
+            
+            println!("🚪 Running focused logout test ({}s timeout)", timeout_seconds);
+            println!("📋 Episode: {}, Session: {}", episode_id, session_token);
+            
+            run_logout_with_timeout(auth_keypair, episode_id, session_token, peer_url, timeout_seconds).await?;
+        }
+        Some(("revoke-session", sub_matches)) => {
+            let episode_id: u64 = sub_matches
+                .get_one::<String>("episode-id")
+                .unwrap()
+                .parse()
+                .map_err(|_| "Invalid episode ID")?;
+            
+            let session_token = sub_matches
+                .get_one::<String>("session-token")
+                .unwrap()
+                .clone();
+            
+            let peer_url = sub_matches.get_one::<String>("peer").unwrap().clone();
+            
+            // Get private key using unified wallet system
+            let auth_keypair = if let Some(provided_private_key) = sub_matches.get_one::<String>("key") {
+                parse_private_key(provided_private_key)?
+            } else {
+                let wallet = get_wallet_for_command("participant-peer", None)?;
+                wallet.keypair
+            };
+            
+            println!("🔄 Running session revocation (blockchain transaction)");
+            run_session_revocation(auth_keypair, episode_id, session_token, peer_url).await?;
+        }
+        Some(("wallet-status", sub_matches)) => {
+            let role = sub_matches.get_one::<String>("role").unwrap();
+            show_wallet_status(role)?;
         }
         Some(("demo", _)) => {
             run_interactive_demo()?;
@@ -763,7 +995,7 @@ async fn run_automatic_authentication(keypair: Keypair) -> Result<(), Box<dyn Er
 /// 🚀 HTTP Coordinated authentication - hybrid kdapp + HTTP coordination  
 /// This function attempts to use pure kdapp authentication first, and falls back to HTTP coordination
 /// for challenge retrieval if the blockchain-based challenge retrieval times out.
-async fn run_http_coordinated_authentication(kaspa_signer: Keypair, auth_signer: Keypair, peer_url: String) -> Result<(), Box<dyn Error>> {
+pub async fn run_http_coordinated_authentication(kaspa_signer: Keypair, auth_signer: Keypair, peer_url: String) -> Result<AuthenticationResult, Box<dyn Error>> {
     use kdapp::{
         engine::EpisodeMessage,
         generator::{self, TransactionGenerator},
@@ -896,13 +1128,15 @@ async fn run_http_coordinated_authentication(kaspa_signer: Keypair, auth_signer:
     println!("🔍 Looking for episode ID: {}", episode_id);
     let mut challenge = String::new();
     let mut attempt_count = 0;
-    let max_attempts = 20; // 2 second timeout - Hybrid mode with HTTP fallback
+    let max_attempts = 150; // 30 second timeout - Hybrid mode with HTTP fallback
     
     // Try to get challenge from blockchain first
     'blockchain_loop: loop {
         attempt_count += 1;
         
-        if let Ok((received_episode_id, episode_state)) = response_receiver.try_recv() {
+        let recv_result = tokio::time::timeout(tokio::time::Duration::from_millis(200), response_receiver.recv()).await;
+        
+        if let Ok(Some((received_episode_id, episode_state))) = recv_result {
             println!("📨 Received episode state update for ID: {} (expecting: {})", received_episode_id, episode_id);
             if received_episode_id == episode_id {
                 if let Some(server_challenge) = &episode_state.challenge {
@@ -922,92 +1156,15 @@ async fn run_http_coordinated_authentication(kaspa_signer: Keypair, auth_signer:
         }
         
         if attempt_count >= max_attempts {
-            println!("⚠️ Timeout waiting for challenge from blockchain. Falling back to HTTP coordination...");
-            
-            // HTTP coordination fallback (working version)
-            let client = reqwest::Client::new();
-            let public_key_hex = hex::encode(client_pubkey.0.serialize());
-            
-            println!("📝 Registering episode {} with HTTP organizer...", episode_id);
-            
-            // Try to register the episode with HTTP server
-            let register_url = format!("{}/auth/register-episode", peer_url);
-            let register_response = client
-                .post(&register_url)
-                .header("Content-Type", "application/json")
-                .json(&serde_json::json!({
-                    "episode_id": episode_id,
-                    "public_key": public_key_hex
-                }))
-                .send()
-                .await;
-            
-            if register_response.is_ok() {
-                println!("✅ Episode registered with HTTP organizer");
-            } else {
-                println!("⚠️ Could not register episode, trying legacy endpoint...");
-            }
-            
-            // Get challenge via HTTP (working version with both endpoints)
-            for retry_attempt in 1..=5 {
-                println!("🔄 HTTP coordination attempt {} of 5...", retry_attempt);
-                
-                // Try both the new status endpoint and legacy challenge endpoint
-                let status_url = format!("{}/auth/status/{}", peer_url, episode_id);
-                let challenge_url = format!("{}/challenge/{}", peer_url, episode_id);
-                
-                // First try the status endpoint
-                match client.get(&status_url).send().await {
-                    Ok(response) if response.status().is_success() => {
-                        if let Ok(status_json) = response.text().await {
-                            println!("📡 HTTP status response: {}", status_json);
-                            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&status_json) {
-                                if let Some(server_challenge) = parsed["challenge"].as_str() {
-                                    challenge = server_challenge.to_string();
-                                    println!("🎯 Challenge retrieved via HTTP status: {}", challenge);
-                                    break 'blockchain_loop;
-                                }
-                            }
-                        }
-                    }
-                    _ => {
-                        // If status fails, try legacy challenge endpoint
-                        match client.get(&challenge_url).send().await {
-                            Ok(response) if response.status().is_success() => {
-                                if let Ok(challenge_json) = response.text().await {
-                                    println!("📡 HTTP legacy response: {}", challenge_json);
-                                    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&challenge_json) {
-                                        if let Some(server_challenge) = parsed["challenge"].as_str() {
-                                            challenge = server_challenge.to_string();
-                                            println!("🎯 Challenge retrieved via HTTP legacy: {}", challenge);
-                                            break 'blockchain_loop;
-                                        }
-                                    }
-                                }
-                            }
-                            _ => {
-                                println!("❌ HTTP attempt {} failed", retry_attempt);
-                            }
-                        }
-                    }
-                }
-                
-                // Wait before retry
-                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-            }
-            
-            // All attempts failed - exit with error
-            return Err("❌ HYBRID AUTHENTICATION FAILED: Could not retrieve challenge via blockchain or HTTP coordination. Please ensure the organizer peer is running and accessible.".into());
+            return Err("❌ AUTHENTICATION FAILED: Could not retrieve challenge from blockchain within timeout. No HTTP fallback.".into());
         }
         
         // Add timeout to prevent infinite waiting
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }
     
-    // Stop listening after we get the challenge
-    exit_signal.store(true, std::sync::atomic::Ordering::Relaxed);
-    
     // Step 3: Sign challenge and send SubmitResponse command to blockchain
+    // NOTE: Keep proxy alive to receive authentication completion!
     println!("✍️ Signing challenge...");
     
     
@@ -1037,7 +1194,338 @@ async fn run_http_coordinated_authentication(kaspa_signer: Keypair, auth_signer:
     println!("🎯 Real kdapp architecture: Generator → Proxy → Engine → Episode");
     println!("📊 Transactions are now being processed by auth server's kdapp engine");
     
+    // Wait for authentication to complete and get the real session token from blockchain
+    println!("⏳ Waiting for authentication completion to retrieve session token...");
+    let mut session_token = String::new();
+    let mut wait_attempts = 0;
+    let max_wait_attempts = 50; // 5 second timeout
+    
+    'auth_wait: loop {
+        wait_attempts += 1;
+        
+        if let Ok((received_episode_id, episode_state)) = response_receiver.try_recv() {
+            if received_episode_id == episode_id && episode_state.is_authenticated {
+                if let Some(token) = &episode_state.session_token {
+                    session_token = token.clone();
+                    println!("✅ Real session token retrieved from blockchain: {}", session_token);
+                    // Now we can stop the proxy - authentication is complete
+                    exit_signal.store(true, std::sync::atomic::Ordering::Relaxed);
+                    break 'auth_wait;
+                }
+            }
+        }
+        
+        if wait_attempts >= max_wait_attempts {
+            return Err("❌ AUTHENTICATION FAILED: Could not retrieve session token from blockchain. Authentication incomplete.".into());
+        }
+        
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    }
+    
+    Ok(AuthenticationResult {
+        episode_id: episode_id.into(),
+        session_token,
+        authenticated: true,
+    })
+}
+
+/// 🔄 Session revocation - revoke an active session on blockchain
+pub async fn run_session_revocation(auth_signer: Keypair, episode_id: u64, session_token: String, _peer_url: String) -> Result<(), Box<dyn Error>> {
+    use kdapp::{
+        engine::EpisodeMessage,
+        generator::{self, TransactionGenerator},
+        proxy::connect_client,
+    };
+    use kaspa_addresses::{Address, Prefix, Version};
+    use kaspa_consensus_core::{network::NetworkId, tx::{TransactionOutpoint, UtxoEntry}};
+    use kaspa_wrpc_client::prelude::*;
+    use kaspa_rpc_core::api::rpc::RpcApi;
+    use kaspa_auth::episode_runner::{AUTH_PATTERN, AUTH_PREFIX};
+    
+    let client_pubkey = kdapp::pki::PubKey(auth_signer.public_key());
+    println!("🔄 Revoking session on blockchain...");
+    println!("🔑 Auth public key: {}", client_pubkey);
+    println!("📧 Episode ID: {}", episode_id);
+    println!("🎫 Session token: {}", session_token);
+    
+    // Step 1: Connect to Kaspa network
+    let network = NetworkId::with_suffix(kaspa_consensus_core::network::NetworkType::Testnet, 10);
+    let kaspad = connect_client(network, None).await?;
+    let kaspa_addr = Address::new(
+        Prefix::Testnet, 
+        Version::PubKey, 
+        &auth_signer.x_only_public_key().0.serialize()
+    );
+    
+    println!("🔗 Connected to Kaspa testnet-10");
+    println!("💰 Funding address: {}", kaspa_addr);
+    
+    // Step 2: Get UTXOs for transaction funding
+    let entries = kaspad.get_utxos_by_addresses(vec![kaspa_addr.clone()]).await?;
+    if entries.is_empty() {
+        return Err(format!("❌ No UTXOs found for address {}. Please fund this address first.", kaspa_addr).into());
+    }
+    
+    let utxo = entries.first().map(|entry| {
+        (TransactionOutpoint::from(entry.outpoint.clone()), UtxoEntry::from(entry.utxo_entry.clone()))
+    }).unwrap();
+    
+    println!("✅ Using UTXO: {}", utxo.0);
+    
+    // Step 3: Sign the session token to prove ownership
+    println!("✍️ Signing session token to prove ownership...");
+    let msg = kdapp::pki::to_message(&session_token);
+    let signature = kdapp::pki::sign_message(&auth_signer.secret_key(), &msg);
+    let signature_hex = hex::encode(signature.0.serialize_der());
+    
+    // Step 4: Create RevokeSession command
+    println!("📤 Creating RevokeSession command...");
+    let auth_command = AuthCommand::RevokeSession {
+        session_token: session_token.clone(),
+        signature: signature_hex,
+    };
+    
+    // Step 5: Build transaction and submit to blockchain
+    let episode_id_u32 = episode_id as u32; // Convert for kdapp framework
+    let step = EpisodeMessage::<SimpleAuth>::new_signed_command(
+        episode_id_u32, 
+        auth_command, 
+        auth_signer.secret_key(), 
+        client_pubkey
+    );
+    
+    let generator = TransactionGenerator::new(auth_signer, AUTH_PATTERN, AUTH_PREFIX);
+    
+    let tx = generator.build_command_transaction(utxo, &kaspa_addr, &step, 5000);
+    
+    println!("🚀 Submitting RevokeSession transaction: {}", tx.id());
+    
+    let _res = kaspad.submit_transaction(tx.as_ref().into(), false).await?;
+    
+    println!("✅ Session revocation submitted to Kaspa blockchain!");
+    println!("🔄 Session token {} has been revoked", session_token);
+    println!("📊 Transaction is now being processed by auth organizer peer's kdapp engine");
+    
     Ok(())
+}
+
+/// Show wallet status for debugging and verification
+fn show_wallet_status(role: &str) -> Result<(), Box<dyn Error>> {
+    use std::path::Path;
+    
+    println!("🔍 Kaspa Auth Wallet Status Report");
+    println!("==================================");
+    
+    let wallet_dir = Path::new(".kaspa-auth");
+    
+    if !wallet_dir.exists() {
+        println!("❌ No .kaspa-auth directory found");
+        println!("💡 Run any command to create initial wallets");
+        return Ok(());
+    }
+    
+    match role {
+        "all" => {
+            check_wallet_role("organizer-peer");
+            println!();
+            check_wallet_role("participant-peer");
+        },
+        role => check_wallet_role(role),
+    }
+    
+    println!();
+    println!("🚰 Testnet Faucet: https://faucet.kaspanet.io/");
+    println!("🔍 Explorer: https://explorer.kaspanet.io/");
+    
+    Ok(())
+}
+
+fn check_wallet_role(role: &str) {
+    use std::path::Path;
+    
+    let wallet_file = Path::new(".kaspa-auth").join(format!("{}-wallet.key", role));
+    
+    println!("🔑 {} Wallet:", role.to_uppercase());
+    
+    if wallet_file.exists() {
+        // Try to load the wallet to get address info
+        match get_wallet_for_command(role, None) {
+            Ok(wallet) => {
+                let kaspa_addr = wallet.get_kaspa_address();
+                let file_size = std::fs::metadata(&wallet_file)
+                    .map(|m| m.len())
+                    .unwrap_or(0);
+                
+                println!("  ✅ Status: EXISTS and LOADED");
+                println!("  📁 File: {}", wallet_file.display());
+                println!("  📊 Size: {} bytes", file_size);
+                println!("  🏠 Address: {}", kaspa_addr);
+                println!("  🔄 Will be REUSED on next run");
+            }
+            Err(e) => {
+                println!("  ❌ Status: EXISTS but CORRUPTED");
+                println!("  📁 File: {}", wallet_file.display());
+                println!("  ⚠️  Error: {}", e);
+                println!("  🔧 Solution: Delete file to recreate");
+            }
+        }
+    } else {
+        println!("  ❓ Status: NOT CREATED YET");
+        println!("  📁 Will create: {}", wallet_file.display());
+        println!("  🆕 Will be NEW on next run");
+    }
+}
+
+// New focused authentication testing functions with timeouts
+
+async fn run_authentication_with_timeout(
+    auth_keypair: Keypair, 
+    peer_url: Option<String>, 
+    timeout_seconds: u64
+) -> Result<(), Box<dyn Error>> {
+    println!("🔥 Starting focused authentication test ({}s timeout)", timeout_seconds);
+    
+    let timeout_duration = tokio::time::Duration::from_secs(timeout_seconds);
+    
+    if let Some(url) = peer_url {
+        // Get funding keypair for HTTP coordination
+        let funding_wallet = get_wallet_for_command("participant-peer", None)?;
+        let funding_keypair = funding_wallet.keypair;
+        
+        println!("🌐 Using HTTP coordination: {}", url);
+        let auth_result = tokio::time::timeout(timeout_duration, run_http_coordinated_authentication(funding_keypair, auth_keypair, url)).await;
+        
+        match auth_result {
+            Ok(result) => {
+                match result {
+                    Ok(_) => {
+                        println!("✅ Authentication completed within {}s timeout", timeout_seconds);
+                        Ok(())
+                    }
+                    Err(e) => {
+                        println!("❌ Authentication failed: {}", e);
+                        Err(e)
+                    }
+                }
+            }
+            Err(_) => {
+                println!("⏰ Authentication timed out after {}s", timeout_seconds);
+                Err("Authentication timeout".into())
+            }
+        }
+    } else {
+        println!("⚡ Using pure kdapp (experimental)");
+        let auth_result = tokio::time::timeout(timeout_duration, run_automatic_authentication(auth_keypair)).await;
+        
+        match auth_result {
+            Ok(result) => {
+                match result {
+                    Ok(_) => {
+                        println!("✅ Authentication completed within {}s timeout", timeout_seconds);
+                        Ok(())
+                    }
+                    Err(e) => {
+                        println!("❌ Authentication failed: {}", e);
+                        Err(e)
+                    }
+                }
+            }
+            Err(_) => {
+                println!("⏰ Authentication timed out after {}s", timeout_seconds);
+                Err("Authentication timeout".into())
+            }
+        }
+    }
+}
+
+async fn run_full_authentication_cycle(
+    funding_keypair: Keypair,
+    auth_keypair: Keypair, 
+    peer_url: String,
+    session_duration: u64,
+    auth_timeout: u64
+) -> Result<(), Box<dyn Error>> {
+    println!("🔄 Starting complete authentication lifecycle test");
+    println!("⏱️  Phase 1: Login ({}s timeout)", auth_timeout);
+    
+    // Phase 1: Authenticate with timeout
+    let auth_timeout_duration = tokio::time::Duration::from_secs(auth_timeout);
+    let auth_future = run_http_coordinated_authentication(funding_keypair, auth_keypair, peer_url.clone());
+    
+    let auth_result = tokio::time::timeout(auth_timeout_duration, auth_future).await;
+    
+    let authentication_details = match auth_result {
+        Ok(Ok(auth_details)) => {
+            println!("✅ Phase 1: Authentication successful!");
+            println!("📋 Episode ID: {}, Session Token: {}", auth_details.episode_id, auth_details.session_token);
+            auth_details
+        }
+        Ok(Err(e)) => {
+            println!("❌ Phase 1: Authentication failed: {}", e);
+            return Err(e);
+        }
+        Err(_) => {
+            println!("⏰ Phase 1: Authentication timed out after {}s", auth_timeout);
+            return Err("Authentication timeout".into());
+        }
+    };
+    
+    // Phase 2: Simulate active session
+    println!("⏱️  Phase 2: Active session ({}s duration)", session_duration);
+    println!("🔒 Session is active - simulating user activity...");
+    
+    tokio::time::sleep(tokio::time::Duration::from_secs(session_duration)).await;
+    
+    // Phase 3: Logout using authentication details from Phase 1
+    println!("⏱️  Phase 3: Logout initiated");
+    println!("🚪 Revoking session {} for episode {}", authentication_details.session_token, authentication_details.episode_id);
+    
+    match run_session_revocation(auth_keypair, authentication_details.episode_id, authentication_details.session_token, peer_url).await {
+        Ok(_) => {
+            println!("✅ Phase 3: Session revocation successful!");
+            println!("✅ Full authentication cycle test completed - Login → Active Session → Logout");
+        }
+        Err(e) => {
+            println!("❌ Phase 3: Session revocation failed: {}", e);
+            println!("⚠️  Authentication cycle incomplete - logout failed");
+            return Err(format!("Logout failed: {}", e).into());
+        }
+    }
+    
+    Ok(())
+}
+
+async fn run_logout_with_timeout(
+    auth_keypair: Keypair,
+    episode_id: u64,
+    session_token: String,
+    peer_url: String,
+    timeout_seconds: u64
+) -> Result<(), Box<dyn Error>> {
+    println!("🚪 Starting focused logout test ({}s timeout)", timeout_seconds);
+    println!("📋 Episode: {}, Session: {}", episode_id, session_token);
+    
+    let timeout_duration = tokio::time::Duration::from_secs(timeout_seconds);
+    let logout_future = run_session_revocation(auth_keypair, episode_id, session_token, peer_url);
+    
+    match tokio::time::timeout(timeout_duration, logout_future).await {
+        Ok(result) => {
+            match result {
+                Ok(_) => {
+                    println!("✅ Logout completed within {}s timeout", timeout_seconds);
+                    Ok(())
+                }
+                Err(e) => {
+                    println!("❌ Logout failed: {}", e);
+                    Err(e)
+                }
+            }
+        }
+        Err(_) => {
+            println!("⏰ Logout timed out after {}s", timeout_seconds);
+            Err("Logout timeout".into())
+        }
+    }
 }
 
 #[cfg(test)]

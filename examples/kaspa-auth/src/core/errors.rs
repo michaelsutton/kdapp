@@ -11,6 +11,9 @@ pub enum AuthError {
     RateLimited,
     InvalidSignature,
     ChallengeExpired,
+    SessionNotFound,
+    InvalidSessionToken,
+    SessionAlreadyRevoked,
 }
 
 impl std::fmt::Display for AuthError {
@@ -24,6 +27,9 @@ impl std::fmt::Display for AuthError {
             AuthError::RateLimited => write!(f, "Rate limit exceeded. Please try again later."),
             AuthError::InvalidSignature => write!(f, "Invalid signature format."),
             AuthError::ChallengeExpired => write!(f, "Challenge has expired."),
+            AuthError::SessionNotFound => write!(f, "Session not found or not authenticated."),
+            AuthError::InvalidSessionToken => write!(f, "Invalid or malformed session token."),
+            AuthError::SessionAlreadyRevoked => write!(f, "Session has already been revoked."),
         }
     }
 }

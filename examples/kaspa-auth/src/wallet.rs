@@ -178,22 +178,32 @@ impl KaspaAuthWallet {
         
         match command {
             "organizer-peer" | "http-peer" | "server" | "http-server" => {
+                let kaspa_addr = wallet.get_kaspa_address();
                 if wallet.was_created {
-                    println!("🚀 Starting {} with new wallet", command);
+                    println!("🆕 Creating NEW organizer-peer wallet");
+                    println!("🔑 New Kaspa address: {}", kaspa_addr);
+                    println!("💾 Wallet saved to: .kaspa-auth/organizer-peer-wallet.key");
                 } else {
-                    println!("🚀 Starting {} with existing wallet", command);
+                    println!("🔄 REUSING existing organizer-peer wallet");
+                    println!("🔑 Existing Kaspa address: {}", kaspa_addr);
+                    println!("📁 Loaded from: .kaspa-auth/organizer-peer-wallet.key");
                 }
                 wallet.show_funding_reminder();
             },
-            "client" | "authenticate" => {
+            "participant-peer" | "web-participant" | "authenticate" | "client" => {
+                let kaspa_addr = wallet.get_kaspa_address();
                 if wallet.was_created {
-                    println!("🔗 Connecting as client with new wallet");
+                    println!("🆕 Creating NEW participant-peer wallet");
+                    println!("🔑 New Kaspa address: {}", kaspa_addr);
+                    println!("💾 Wallet saved to: .kaspa-auth/participant-peer-wallet.key");
                 } else {
-                    println!("🔗 Connecting as client with existing wallet");
+                    println!("🔄 REUSING existing participant-peer wallet");
+                    println!("🔑 Existing Kaspa address: {}", kaspa_addr);
+                    println!("📁 Loaded from: .kaspa-auth/participant-peer-wallet.key");
                 }
             },
             _ => {
-                println!("🔑 Using wallet for {}", command);
+                println!("🔑 Using {} wallet ({})", command, if wallet.was_created { "NEW" } else { "EXISTING" });
             }
         }
         

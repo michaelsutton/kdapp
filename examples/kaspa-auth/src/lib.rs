@@ -7,6 +7,7 @@ pub mod api;
 // Framework modules (re-enable anytime)
 pub mod cli;
 pub mod wallet;
+pub mod auth;
 
 // Future modules (moved to future examples)
 // pub mod commitments;     // → kaspa-poker-tournament
@@ -21,3 +22,4 @@ pub mod wallet;
 // Public API exports (only working functionality)
 pub use core::commands::AuthCommand;
 pub use episode_runner::{AuthEventHandler, AuthServerConfig, run_auth_server, create_auth_generator};
+pub use auth::{run_http_coordinated_authentication, run_session_revocation, AuthenticationResult};

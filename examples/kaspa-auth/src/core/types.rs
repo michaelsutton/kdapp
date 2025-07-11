@@ -13,6 +13,10 @@ pub enum AuthRollback {
         previous_auth_status: bool,
         previous_session_token: Option<String>,
     },
+    SessionRevoked {
+        previous_token: String,
+        was_authenticated: bool,
+    },
 }
 
 /// Authentication state information

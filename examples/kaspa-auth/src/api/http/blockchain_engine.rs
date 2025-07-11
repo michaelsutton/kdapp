@@ -230,6 +230,13 @@ impl EpisodeEventHandler<SimpleAuth> for HttpAuthHandler {
     ) {
         println!("⚡ Episode {} updated on blockchain", episode_id);
         
+        // Read previous state BEFORE updating (for session revocation detection)
+        let previous_episode = if let Ok(episodes) = self.blockchain_episodes.lock() {
+            episodes.get(&(episode_id as u64)).cloned()
+        } else {
+            None
+        };
+        
         // Update episode in shared blockchain state
         if let Ok(mut episodes) = self.blockchain_episodes.lock() {
             episodes.insert(episode_id.into(), episode.clone());
@@ -239,17 +246,7 @@ impl EpisodeEventHandler<SimpleAuth> for HttpAuthHandler {
         }
         
         // Check what kind of update this is
-        if episode.challenge.is_some() && !episode.is_authenticated {
-            // Challenge was issued
-            let message = WebSocketMessage {
-                message_type: "challenge_issued".to_string(),
-                episode_id: Some(episode_id.into()),
-                authenticated: Some(false),
-                challenge: episode.challenge.clone(),
-                session_token: None,
-            };
-            let _ = self.websocket_tx.send(message);
-        } else if episode.is_authenticated {
+        if episode.is_authenticated && episode.session_token.is_some() {
             // Authentication successful
             let message = WebSocketMessage {
                 message_type: "authentication_successful".to_string(),
@@ -257,6 +254,33 @@ impl EpisodeEventHandler<SimpleAuth> for HttpAuthHandler {
                 authenticated: Some(true),
                 challenge: episode.challenge.clone(),
                 session_token: episode.session_token.clone(),
+            };
+            let _ = self.websocket_tx.send(message);
+        } else if !episode.is_authenticated && episode.session_token.is_none() && episode.challenge.is_some() {
+            // Check if this was a session revocation by comparing with previous state
+            if let Some(prev_episode) = previous_episode {
+                if prev_episode.is_authenticated && prev_episode.session_token.is_some() {
+                    // Previous state was authenticated, now it's not -> session revoked
+                    let message = WebSocketMessage {
+                        message_type: "session_revoked".to_string(),
+                        episode_id: Some(episode_id.into()),
+                        authenticated: Some(false),
+                        challenge: episode.challenge.clone(),
+                        session_token: None,
+                    };
+                    let _ = self.websocket_tx.send(message);
+                    println!("📡 Sent session_revoked WebSocket message for episode {}", episode_id);
+                    return; // Don't send challenge_issued message
+                }
+            }
+            
+            // Challenge was issued (initial state)
+            let message = WebSocketMessage {
+                message_type: "challenge_issued".to_string(),
+                episode_id: Some(episode_id.into()),
+                authenticated: Some(false),
+                challenge: episode.challenge.clone(),
+                session_token: None,
             };
             let _ = self.websocket_tx.send(message);
         }

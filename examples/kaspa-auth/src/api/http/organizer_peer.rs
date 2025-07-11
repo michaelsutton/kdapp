@@ -14,6 +14,7 @@ use crate::api::http::{
         challenge::request_challenge,
         verify::verify_auth,
         status::get_status,
+        revoke::revoke_session,
     },
     blockchain_engine::AuthHttpPeer,
 };
@@ -185,13 +186,24 @@ async fn episode_authenticated(
     let episode_id = payload["episode_id"].as_u64().unwrap_or(0);
     let challenge = payload["challenge"].as_str().unwrap_or("");
     
+    // Get the real session token from blockchain episode
+    let real_session_token = if let Ok(episodes) = state.blockchain_episodes.lock() {
+        if let Some(episode) = episodes.get(&episode_id) {
+            episode.session_token.clone()
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    
     // Broadcast WebSocket message for authentication success
     let ws_message = WebSocketMessage {
         message_type: "authentication_successful".to_string(),
         episode_id: Some(episode_id),
         authenticated: Some(true),
         challenge: Some(challenge.to_string()),
-        session_token: Some(format!("sess_{}", episode_id)),
+        session_token: real_session_token,
     };
     
     // Send to all connected WebSocket clients
@@ -201,6 +213,42 @@ async fn episode_authenticated(
         "status": "success",
         "episode_id": episode_id,
         "message": "Authentication notification sent"
+    }))
+}
+
+async fn session_revoked(
+    State(state): State<PeerState>,
+    Json(payload): Json<serde_json::Value>,
+) -> Json<serde_json::Value> {
+    let episode_id = payload["episode_id"].as_u64().unwrap_or(0);
+    let session_token = payload["session_token"].as_str().unwrap_or("");
+    
+    println!("🔔 Received session revocation notification for episode {}, token: {}", episode_id, session_token);
+    
+    // Broadcast WebSocket message for session revocation success
+    let ws_message = WebSocketMessage {
+        message_type: "session_revoked".to_string(),
+        episode_id: Some(episode_id),
+        authenticated: Some(false),
+        challenge: None,
+        session_token: Some(session_token.to_string()),
+    };
+    
+    // Send to all connected WebSocket clients
+    match state.websocket_tx.send(ws_message) {
+        Ok(_) => {
+            println!("✅ Session revocation WebSocket message sent for episode {}", episode_id);
+        }
+        Err(e) => {
+            println!("❌ Failed to send session revocation WebSocket message: {}", e);
+        }
+    }
+    
+    Json(json!({
+        "status": "success",
+        "episode_id": episode_id,
+        "session_token": session_token,
+        "message": "Session revocation notification sent"
     }))
 }
 
@@ -240,8 +288,10 @@ pub async fn run_http_peer(provided_private_key: Option<&str>, port: u16) -> Res
         .route("/auth/request-challenge", post(request_challenge))
         .route("/auth/sign-challenge", post(sign_challenge))
         .route("/auth/verify", post(verify_auth))
+        .route("/auth/revoke-session", post(revoke_session))
         .route("/auth/status/{episode_id}", get(get_status))
         .route("/internal/episode-authenticated", post(episode_authenticated))
+        .route("/internal/session-revoked", post(session_revoked))
         .fallback_service(ServeDir::new("public"))
         .with_state(peer_state)
         .layer(cors);

@@ -23,12 +23,11 @@ pub const AUTH_PREFIX: PrefixType = 0x41555448; // "AUTH" in hex
 /// Event handler for authentication episodes
 pub struct AuthEventHandler {
     pub name: String,
-    pub episode_challenges: Arc<Mutex<HashMap<u64, String>>>,
 }
 
 impl AuthEventHandler {
-    pub fn new(name: String, episode_challenges: Arc<Mutex<HashMap<u64, String>>>) -> Self {
-        Self { name, episode_challenges }
+    pub fn new(name: String) -> Self {
+        Self { name }
     }
 }
 
@@ -48,11 +47,7 @@ impl EpisodeEventHandler<SimpleAuth> for AuthEventHandler {
                 if let Some(challenge) = &episode.challenge {
                     info!("[{}] Episode {}: Challenge generated: {}", 
                           self.name, episode_id, challenge);
-                    // Store challenge for HTTP coordination
-                    if let Ok(mut challenges) = self.episode_challenges.lock() {
-                        challenges.insert(episode_id as u64, challenge.clone());
                     }
-                }
             }
             AuthCommand::SubmitResponse { signature: _, nonce } => {
                 info!("[{}] Episode {}: Response submitted with nonce: {}", 
@@ -89,6 +84,45 @@ impl EpisodeEventHandler<SimpleAuth> for AuthEventHandler {
                     });
                 } else {
                     warn!("[{}] Episode {}: ❌ Authentication failed - invalid signature", 
+                          self.name, episode_id);
+                }
+            }
+            AuthCommand::RevokeSession { session_token, signature: _ } => {
+                info!("[{}] Episode {}: Session revocation requested for token: {}", 
+                      self.name, episode_id, session_token);
+                if !episode.is_authenticated {
+                    info!("[{}] Episode {}: ✅ Session successfully revoked!", 
+                          self.name, episode_id);
+                    
+                    // Notify HTTP server about successful session revocation
+                    let client = Client::new();
+                    let episode_id_clone = episode_id;
+                    let session_token_clone = session_token.clone();
+                    tokio::spawn(async move {
+                        let url = "http://127.0.0.1:8080/internal/session-revoked"; // TODO: Make configurable
+                        info!("Attempting to notify HTTP server of session revocation at {}", url);
+                        let res = client.post(url)
+                            .json(&json!({
+                                "episode_id": episode_id_clone,
+                                "session_token": session_token_clone,
+                            }))
+                            .send()
+                            .await;
+                        
+                        match res {
+                            Ok(response) if response.status().is_success() => {
+                                info!("✅ Successfully notified HTTP server of session revocation for episode {}", episode_id_clone);
+                            },
+                            Ok(response) => {
+                                error!("❌ Failed to notify HTTP server of session revocation for episode {}: Status {}", episode_id_clone, response.status());
+                            },
+                            Err(e) => {
+                                error!("❌ Failed to notify HTTP server of session revocation for episode {}: Error {}", episode_id_clone, e);
+                            }
+                        }
+                    });
+                } else {
+                    warn!("[{}] Episode {}: ❌ Session revocation failed", 
                           self.name, episode_id);
                 }
             }
@@ -137,7 +171,6 @@ pub struct AuthResponse {
 /// Simple coordination state
 pub struct CoordinationState {
     pub challenges: Arc<Mutex<HashMap<String, String>>>,
-    pub episode_challenges: Arc<Mutex<HashMap<u64, String>>>,
 }
 
 impl AuthServerConfig {
@@ -161,13 +194,12 @@ pub async fn run_auth_server(config: AuthServerConfig) -> Result<(), Box<dyn std
     let kaspad = connect_client(config.network, config.rpc_url.clone()).await?;
     info!("✅ Connected to Kaspa node");
 
-    // 2. Set up engine channel and episode challenges storage
+    // 2. Set up engine channel
     let (sender, receiver) = channel();
-    let episode_challenges = Arc::new(Mutex::new(HashMap::new()));
 
     // 3. Create and start engine
     let mut engine = engine::Engine::<SimpleAuth, AuthEventHandler>::new(receiver);
-    let event_handler = AuthEventHandler::new(config.name.clone(), episode_challenges.clone());
+    let event_handler = AuthEventHandler::new(config.name.clone());
     
     let engine_task = tokio::task::spawn_blocking(move || {
         info!("🚀 Starting episode engine");

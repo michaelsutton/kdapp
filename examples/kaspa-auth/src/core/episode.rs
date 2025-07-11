@@ -78,8 +78,8 @@ impl Episode for SimpleAuth {
                 let previous_challenge = self.challenge.clone();
                 let previous_timestamp = self.challenge_timestamp;
                 
-                // Generate new challenge
-                let new_challenge = ChallengeGenerator::generate();
+                // Generate new challenge with timestamp from metadata
+                let new_challenge = ChallengeGenerator::generate_with_provided_timestamp(metadata.accepting_time);
                 self.challenge = Some(new_challenge);
                 self.challenge_timestamp = metadata.accepting_time;
                 self.owner = Some(participant);
@@ -107,7 +107,15 @@ impl Episode for SimpleAuth {
                 };
                 
                 if *nonce != *current_challenge {
+                    info!("[SimpleAuth] Challenge mismatch - received: '{}', expected: '{}'", nonce, current_challenge);
                     return Err(EpisodeError::InvalidCommand(AuthError::InvalidChallenge));
+                }
+                
+                // Check if challenge has expired (1 hour timeout)
+                if !ChallengeGenerator::is_valid(current_challenge, 3600) {
+                    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+                    info!("[SimpleAuth] Challenge expired: {} (current time: {})", current_challenge, now);
+                    return Err(EpisodeError::InvalidCommand(AuthError::ChallengeExpired));
                 }
                 
                 // Verify signature
@@ -121,13 +129,51 @@ impl Episode for SimpleAuth {
                 
                 // Authenticate user
                 self.is_authenticated = true;
-                self.session_token = Some(Self::generate_session_token());
+                self.session_token = Some(self.generate_session_token());
                 
                 info!("[SimpleAuth] Authentication successful for: {:?}", participant);
                 
                 Ok(AuthRollback::Authentication {
                     previous_auth_status,
                     previous_session_token,
+                })
+            }
+            
+            AuthCommand::RevokeSession { session_token, signature } => {
+                info!("[SimpleAuth] RevokeSession from: {:?}", participant);
+                
+                // Check if session exists and matches
+                let Some(ref current_token) = self.session_token else {
+                    return Err(EpisodeError::InvalidCommand(AuthError::SessionNotFound));
+                };
+                
+                if *session_token != *current_token {
+                    return Err(EpisodeError::InvalidCommand(AuthError::InvalidSessionToken));
+                }
+                
+                // Check if already not authenticated (session already revoked)
+                if !self.is_authenticated {
+                    return Err(EpisodeError::InvalidCommand(AuthError::SessionAlreadyRevoked));
+                }
+                
+                // Verify signature - participant must sign their own session token to prove ownership
+                if !SignatureVerifier::verify(&participant, session_token, signature) {
+                    return Err(EpisodeError::InvalidCommand(AuthError::SignatureVerificationFailed));
+                }
+                
+                // Store previous state for rollback
+                let previous_token = self.session_token.clone().unwrap();
+                let was_authenticated = self.is_authenticated;
+                
+                // Revoke session
+                self.is_authenticated = false;
+                self.session_token = None;
+                
+                info!("[SimpleAuth] Session revoked successfully for: {:?}", participant);
+                
+                Ok(AuthRollback::SessionRevoked {
+                    previous_token,
+                    was_authenticated,
                 })
             }
             
@@ -145,6 +191,11 @@ impl Episode for SimpleAuth {
             AuthRollback::Authentication { previous_auth_status, previous_session_token } => {
                 self.is_authenticated = previous_auth_status;
                 self.session_token = previous_session_token;
+                true
+            }
+            AuthRollback::SessionRevoked { previous_token, was_authenticated } => {
+                self.is_authenticated = was_authenticated;
+                self.session_token = Some(previous_token);
                 true
             }
         }
@@ -166,9 +217,11 @@ impl SimpleAuth {
     }
 
     /// Generate a new session token
-    fn generate_session_token() -> String {
-        use rand::{thread_rng, Rng};
-        let mut rng = thread_rng();
+    fn generate_session_token(&self) -> String {
+        use rand_chacha::ChaCha8Rng;
+        use rand::SeedableRng;
+        use rand::Rng;
+        let mut rng = ChaCha8Rng::seed_from_u64(self.challenge_timestamp);
         format!("sess_{}", rng.gen::<u64>())
     }
 

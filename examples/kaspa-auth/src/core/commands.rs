@@ -11,6 +11,11 @@ pub enum AuthCommand {
         signature: String,
         nonce: String,
     },
+    /// Revoke an existing session
+    RevokeSession {
+        session_token: String,
+        signature: String,
+    },
 }
 
 impl AuthCommand {
@@ -19,6 +24,7 @@ impl AuthCommand {
         match self {
             AuthCommand::RequestChallenge => "RequestChallenge",
             AuthCommand::SubmitResponse { .. } => "SubmitResponse",
+            AuthCommand::RevokeSession { .. } => "RevokeSession",
         }
     }
     
@@ -27,6 +33,7 @@ impl AuthCommand {
         match self {
             AuthCommand::RequestChallenge => false,
             AuthCommand::SubmitResponse { .. } => true,
+            AuthCommand::RevokeSession { .. } => true,
         }
     }
 }

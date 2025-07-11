@@ -1,4 +1,6 @@
 use rand::{thread_rng, Rng};
+use rand_chacha::ChaCha8Rng;
+use rand::SeedableRng;
 
 /// Challenge generation utilities
 pub struct ChallengeGenerator;
@@ -25,6 +27,12 @@ impl ChallengeGenerator {
             .as_secs();
         let challenge = format!("auth_{}_{}", timestamp, rng.gen::<u64>());
         (challenge, timestamp)
+    }
+    
+    /// Generate a challenge with a provided timestamp for expiry
+    pub fn generate_with_provided_timestamp(timestamp: u64) -> String {
+        let mut rng = ChaCha8Rng::seed_from_u64(timestamp);
+        format!("auth_{}_{}", timestamp, rng.gen::<u64>())
     }
     
     /// Validate if a challenge is still valid (not expired)

@@ -22,6 +22,140 @@
 
 **Why This Matters**: When we use "server/client" language, we unconsciously default to hierarchical thinking patterns that are fundamentally wrong for kdapp architecture. This causes implementation bugs, security issues, and architectural confusion.
 
+## 🚨 CRITICAL: WORKING DIRECTORY RULE
+
+### ❌ WRONG: Running from Root Directory
+```bash
+# DON'T RUN FROM HERE:
+/kdapp/$ cargo run --bin kaspa-auth -- http-peer
+# ERROR: Can't find kaspa-auth binary!
+```
+
+### ✅ CORRECT: Always Run from examples/kaspa-auth/
+```bash
+# ALWAYS RUN FROM HERE:
+/kdapp/examples/kaspa-auth/$ cargo run --bin kaspa-auth -- http-peer
+# SUCCESS: HTTP peer starts correctly!
+```
+
+### 🔥 THE #1 CONFUSION SOURCE
+**RULE**: ALL kaspa-auth commands MUST be run from the `examples/kaspa-auth/` directory!
+
+**Why This Happens**:
+- Root `/kdapp/` contains the framework
+- `/kdapp/examples/kaspa-auth/` contains the auth implementation
+- Cargo looks for `kaspa-auth` binary in current workspace
+- Wrong directory = "binary not found" errors
+
+### 🎯 Quick Directory Check
+```bash
+# Verify you're in the right place:
+pwd
+# Should show: .../kdapp/examples/kaspa-auth
+
+# If in wrong directory:
+cd examples/kaspa-auth/  # From kdapp root
+# OR
+cd /path/to/kdapp/examples/kaspa-auth/  # From anywhere
+```
+
+### 💡 Working Commands (from examples/kaspa-auth/)
+```bash
+# ✅ These work from examples/kaspa-auth/ directory:
+cargo run --bin kaspa-auth -- wallet-status
+cargo run --bin kaspa-auth -- http-peer --port 8080  
+cargo run --bin kaspa-auth -- authenticate
+cargo run --bin kaspa-auth -- revoke-session --episode-id 123 --session-token sess_xyz
+
+# ❌ These FAIL from kdapp/ root directory:
+# "error: no bin target named `kaspa-auth`"
+```
+
+### 🔧 Pro Tip: Terminal Management
+```bash
+# Set up dedicated terminal for kaspa-auth:
+cd /path/to/kdapp/examples/kaspa-auth/
+# Pin this terminal tab for all kaspa-auth work!
+```
+
+## 🚫 NO PREMATURE CELEBRATION RULE
+
+### ❌ WRONG: Celebrating Before Commit
+- "🎉 SUCCESS!" before git commit
+- "✅ COMPLETE!" before testing
+- "🏆 ACHIEVEMENT!" before verification
+- Excessive celebration language wastes tokens
+
+### ✅ CORRECT: Professional Development Workflow
+- Test functionality
+- Fix any issues  
+- Commit changes
+- Brief acknowledgment only
+
+**RULE**: No celebration emojis or extensive success language until work is committed and verified. Keep responses focused and token-efficient.
+
+## 🔑 CRITICAL WALLET PERSISTENCE RULE
+
+### ❌ WRONG: Recreating Wallets Every Feature Addition
+```rust
+// This creates NEW wallets every time:
+let wallet = generate_new_keypair(); // WRONG!
+```
+
+### ✅ CORRECT: Persistent Wallet Architecture
+```rust
+// This reuses existing wallets:
+let wallet = get_wallet_for_command("organizer-peer", None)?; // CORRECT!
+```
+
+### 🚨 THE PERSISTENT WALLET PRINCIPLE
+**RULE**: Once a wallet is created for a role, it MUST be reused across ALL feature additions and sessions.
+
+**File Structure**:
+```
+.kaspa-auth/
+├── organizer-peer-wallet.key     # HTTP Organizer Peer wallet
+└── participant-peer-wallet.key   # CLI/Web Participant wallet
+```
+
+**Implementation Requirements**:
+1. **Separate wallet files** per peer role (organizer vs participant)
+2. **Persistent storage** in `.kaspa-auth/` directory  
+3. **Clear messaging** about wallet reuse vs creation
+4. **First-run detection** with appropriate user guidance
+5. **Funding status tracking** for newly created wallets
+
+### 🎯 Why This Matters for kdapp
+- **Identity Consistency**: Same peer = same public key across sessions
+- **Address Stability**: Kaspa addresses don't change between runs
+- **Episode Continuity**: Blockchain recognizes the same participant
+- **User Experience**: No confusion about multiple identities
+- **Economic Model**: UTXOs accumulate in consistent addresses
+
+### 🔧 Implementation Pattern
+```rust
+pub fn get_wallet_for_command(command: &str, private_key: Option<&str>) -> Result<KaspaAuthWallet> {
+    match private_key {
+        Some(key_hex) => KaspaAuthWallet::from_private_key(key_hex), // Override
+        None => KaspaAuthWallet::load_for_command(command) // Persistent reuse
+    }
+}
+```
+
+**NEVER** create new wallets unless:
+1. User explicitly requests it (`--new-wallet` flag)
+2. Wallet file is corrupted and cannot be loaded
+3. User provides explicit private key override
+
+### 💡 User Messaging Best Practices
+```rust
+// GOOD: Clear about reuse
+println!("🔑 Using existing organizer-peer wallet (address: kaspatest:...)");
+
+// BAD: Ambiguous about creation vs reuse  
+println!("🔑 Wallet loaded");
+```
+
 # 🎉 ACHIEVEMENT: Complete P2P Authentication System (Session Management Ready)
 
 ## ✅ COMPLETED: Revolutionary P2P Authentication
@@ -329,4 +463,115 @@ Instead of adding more HTTP fallbacks:
 ---
 
 **Remember**: This is a **pragmatic exception**, not a **precedent**. Every other authentication component must use pure kdapp architecture.
-EOF < /dev/null
+
+## 🚨 CRITICAL SESSION TOKEN AND HTTP FAKING ISSUES
+
+### ❌ ABSOLUTE FORBIDDEN: Session Token Faking/Mismatch
+
+**NEVER create fake session tokens or multiple generation methods:**
+
+```rust
+// ❌ WRONG - Multiple session token generators in kaspa-auth
+fn generate_session_token() -> String {
+    format!("sess_{}", rng.gen::<u64>())  // Episode: sess_13464325652750888064
+}
+
+// ❌ WRONG - HTTP organizer_peer.rs creating fake tokens  
+session_token: Some(format!("sess_{}", episode_id)),  // HTTP: sess_144218627
+
+// ❌ WRONG - main.rs client fallback creating different tokens
+session_token = format!("sess_{}", episode_id);  // Client: sess_3775933173
+```
+
+**✅ CORRECT - Single source of truth (kaspa-auth specific):**
+
+```rust
+// ✅ core/episode.rs - ONLY session token generator
+fn generate_session_token() -> String {
+    format!("sess_{}", rng.gen::<u64>())  // Real random token
+}
+
+// ✅ api/http/organizer_peer.rs - Read from blockchain
+let real_session_token = if let Ok(episodes) = state.blockchain_episodes.lock() {
+    episodes.get(&episode_id)?.session_token.clone()
+} else { None };
+
+// ✅ main.rs client - Read from blockchain listener
+if let Some(token) = &episode_state.session_token {
+    session_token = token.clone();  // Use episode's REAL token
+}
+```
+
+### 🔍 kaspa-auth Session Token Debug Checklist
+
+**Before committing kaspa-auth changes:**
+- [ ] `cargo run -- authenticate-full-flow` shows same token throughout
+- [ ] HTTP WebSocket `authentication_successful` has long token: `sess_<20-digits>`
+- [ ] HTTP WebSocket `session_revoked` references same token
+- [ ] CLI logs and web UI logs show identical session tokens
+- [ ] No "fallback" or "timeout" session token generation
+
+### ❌ kaspa-auth Specific Forbidden Patterns
+
+```rust
+// ❌ WRONG - src/api/http/organizer_peer.rs
+session_token: Some(format!("sess_{}", episode_id)),  // Fake!
+
+// ❌ WRONG - src/main.rs 
+session_token = format!("sess_{}", episode_id);  // Fallback fake!
+
+// ❌ WRONG - Any HTTP endpoint
+"session_token": "mock_token",  // Not from episode!
+
+// ❌ WRONG - Any timeout handler
+if timeout_reached {
+    return Ok("success");  // LIE!
+}
+```
+
+**✅ kaspa-auth Correct Patterns:**
+
+```rust
+// ✅ CORRECT - Read from blockchain_episodes
+if let Some(episode) = state.blockchain_episodes.lock()?.get(&episode_id) {
+    session_token = episode.session_token.clone()  // REAL token
+}
+
+// ✅ CORRECT - Honest timeout failures  
+if timeout_reached {
+    return Err("Authentication timeout - no session token available".into());
+}
+```
+
+### 💡 kaspa-auth Real Bug Example (Fixed)
+
+**The Production Bug (July 11, 2025):**
+```
+WebSocket: {session_token: 'sess_7761919764170048936'}  // HTTP fake (episode_id)
+CLI logs: sess_13464325652750888064                      // Episode real (random)
+Result: RevokeSession rejected - token mismatch ❌
+```
+
+**The Fix Applied:**
+```
+Episode generates: sess_13464325652750888064
+HTTP reads same:   sess_13464325652750888064  
+Client reads same: sess_13464325652750888064
+Revocation works:  Token match ✅
+```
+
+### 🎯 kaspa-auth Anti-Faking Enforcement
+
+**Files to check for faking:**
+- `src/core/episode.rs` - Only place generating session tokens
+- `src/api/http/organizer_peer.rs` - Must read from blockchain_episodes  
+- `src/main.rs` - Client must read from episode state
+- `src/api/http/blockchain_engine.rs` - WebSocket must use episode.session_token
+
+**Commit checklist:**
+1. All session tokens are 20-digit format: `sess_<20-digits>`
+2. No `format!("sess_{}", episode_id)` anywhere except episode.rs
+3. No fallback session token generation in timeouts
+4. HTTP coordination reads blockchain state, never creates state
+
+Remember: **In kaspa-auth, episode.rs is the ONLY source of session tokens**

@@ -8,6 +8,7 @@ kdapp = { path = "../../kdapp" }
 borsh = { workspace = true }
 secp256k1 = { workspace = true }
 rand = { workspace = true }
+rand_chacha = "0.3"
 log = { workspace = true }
 env_logger = { workspace = true }
 clap = { workspace = true }
