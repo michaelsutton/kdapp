@@ -893,6 +893,9 @@
                         console.log(`✅ SUCCESS on organizer '${organizer.name}'`);
                         updateOrganizerStatus(organizer.name, 'success');
                         return response;
+                    } else if (response.status === 503) {
+                        // Wallet needs funding - special handling
+                        throw new Error(`WALLET_NEEDS_FUNDING: Your wallet needs funding for blockchain transactions. Visit https://faucet.kaspanet.io/ and fund address: ${currentWallet.kaspaAddress}`);
                     } else {
                         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                     }
@@ -1241,9 +1244,18 @@
                 
             } catch (error) {
                 console.error('Authentication failed:', error);
-                button.textContent = '[ ERROR - TRY AGAIN ]';
+                
+                if (error.message.includes('WALLET_NEEDS_FUNDING')) {
+                    button.textContent = '[ WALLET NEEDS FUNDING ]';
+                    button.style.background = 'var(--warning)';
+                    button.style.borderColor = 'var(--warning)';
+                    typewriterEffect(`WALLET NEEDS FUNDING! Visit https://faucet.kaspanet.io/ and fund: ${currentWallet.kaspaAddress}`, button.parentElement);
+                } else {
+                    button.textContent = '[ ERROR - TRY AGAIN ]';
+                    typewriterEffect(`ERROR: ${error.message}`, button.parentElement);
+                }
+                
                 button.disabled = false;
-                typewriterEffect(`ERROR: ${error.message}`, button.parentElement);
             }
         }
         
@@ -1284,10 +1296,10 @@
             
             switch (message.type) {
                 case 'episode_created':
-                    if (message.episode_id === currentEpisodeId) {
-                        // Automatically request challenge after episode creation
-                        requestChallengeAfterEpisodeCreation();
-                    }
+                    console.log('🎯 Episode created, requesting challenge...');
+                    currentEpisodeId = message.episode_id; // Ensure episode ID is set
+                    // Automatically request challenge after episode creation
+                    requestChallengeAfterEpisodeCreation();
                     break;
                     
                 case 'challenge_issued':

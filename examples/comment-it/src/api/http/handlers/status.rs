@@ -9,13 +9,14 @@ pub async fn get_status(
     State(state): State<PeerState>,
     Path(episode_id): Path<u64>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
+    println!("🎭 MATRIX UI ACTION: User checking authentication status");
     println!("🔍 Querying episode {} from REAL blockchain state (not memory!)", episode_id);
     
     // ✅ NEW: Query from real blockchain episodes (shared state with kdapp engine)
     match state.blockchain_episodes.lock() {
         Ok(episodes) => {
             if let Some(episode) = episodes.get(&episode_id) {
-                println!("✅ Found episode {} in blockchain state", episode_id);
+                println!("✅ MATRIX UI SUCCESS: Found episode {} in blockchain state", episode_id);
                 println!("   - Authenticated: {}", episode.is_authenticated);
                 println!("   - Challenge: {:?}", episode.challenge);
                 println!("   - Session token: {:?}", episode.session_token);
@@ -31,7 +32,7 @@ pub async fn get_status(
                     "source": "real_blockchain_state"
                 })))
             } else {
-                println!("⚠️ Episode {} not found in blockchain state", episode_id);
+                println!("⚠️ MATRIX UI ERROR: Episode {} not found in blockchain state", episode_id);
                 
                 Ok(Json(json!({
                     "episode_id": episode_id,
@@ -45,7 +46,7 @@ pub async fn get_status(
             }
         }
         Err(e) => {
-            println!("❌ Failed to lock blockchain episodes: {}", e);
+            println!("❌ MATRIX UI ERROR: Failed to lock blockchain episodes - {}", e);
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }

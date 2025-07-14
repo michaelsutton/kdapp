@@ -20,6 +20,7 @@ pub async fn start_auth(
     State(state): State<PeerState>,
     Json(req): Json<AuthRequest>,
 ) -> Result<Json<AuthResponse>, StatusCode> {
+    println!("🎭 MATRIX UI ACTION: User started authentication episode");
     println!("🚀 Submitting REAL NewEpisode transaction to Kaspa blockchain...");
     
     // Parse the participant's public key
@@ -39,7 +40,7 @@ pub async fn start_auth(
             }
         },
         Err(e) => {
-            println!("❌ Hex decode failed: {}", e);
+            println!("❌ MATRIX UI ERROR: Invalid public key format - {}", e);
             return Err(StatusCode::BAD_REQUEST);
         },
     };
@@ -83,7 +84,7 @@ pub async fn start_auth(
         };
         
         if entries.is_empty() {
-            println!("❌ No UTXOs found! Participant wallet needs funding.");
+            println!("❌ MATRIX UI ERROR: Participant wallet needs funding");
             println!("💰 Fund this address: {}", participant_funding_addr);
             println!("🚰 Get testnet funds: https://faucet.kaspanet.io/");
             return Err(StatusCode::SERVICE_UNAVAILABLE);
@@ -112,12 +113,12 @@ pub async fn start_auth(
         utxo,
     ).await {
         Ok(tx_id) => {
-            println!("✅ Transaction {} submitted successfully to blockchain via AuthHttpPeer!", tx_id);
+            println!("✅ MATRIX UI SUCCESS: Auth episode created - Transaction {}", tx_id);
             println!("🎬 Episode {} initialized on blockchain", episode_id);
             (tx_id, "submitted_to_blockchain".to_string())
         }
         Err(e) => {
-            println!("❌ Transaction submission failed via AuthHttpPeer: {}", e);
+            println!("❌ MATRIX UI ERROR: Auth episode creation failed - {}", e);
             println!("💡 Make sure participant wallet is funded: {}", participant_funding_addr);
             ("error".to_string(), "transaction_submission_failed".to_string())
         }

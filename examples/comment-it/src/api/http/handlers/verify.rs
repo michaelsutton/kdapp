@@ -18,6 +18,7 @@ pub async fn verify_auth(
     State(state): State<PeerState>,
     Json(req): Json<VerifyRequest>,
 ) -> Result<Json<VerifyResponse>, StatusCode> {
+    println!("🎭 MATRIX UI ACTION: User submitted authentication signature");
     println!("🔍 DEBUG: Verify request received - episode_id: {}, nonce: {}", req.episode_id, req.nonce);
     println!("🔍 DEBUG: Signature length: {}", req.signature.len());
     println!("📤 Sending SubmitResponse command to blockchain...");
@@ -87,7 +88,7 @@ pub async fn verify_auth(
         };
         
         if entries.is_empty() {
-            println!("❌ No UTXOs found! Participant wallet needs funding.");
+            println!("❌ MATRIX UI ERROR: Participant wallet needs funding for signature verification");
             println!("💰 Fund this address: {}", participant_addr);
             println!("🚰 Get testnet funds: https://faucet.kaspanet.io/");
             return Err(StatusCode::SERVICE_UNAVAILABLE);
@@ -135,12 +136,12 @@ pub async fn verify_auth(
         utxo,
     ).await {
         Ok(tx_id) => {
-            println!("✅ SubmitResponse transaction {} submitted successfully to blockchain via AuthHttpPeer!", tx_id);
+            println!("✅ MATRIX UI SUCCESS: Authentication signature submitted - Transaction {}", tx_id);
             println!("📊 Transactions are now being processed by auth organizer peer's kdapp engine");
             (tx_id, "submit_response_submitted".to_string())
         }
         Err(e) => {
-            println!("❌ SubmitResponse submission failed via AuthHttpPeer: {}", e);
+            println!("❌ MATRIX UI ERROR: Authentication signature submission failed - {}", e);
             ("error".to_string(), "submit_response_failed".to_string())
         }
     };

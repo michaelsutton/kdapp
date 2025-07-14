@@ -48,59 +48,96 @@ async fn funding_info(State(state): State<PeerState>) -> Json<serde_json::Value>
 }
 
 async fn wallet_status() -> Json<serde_json::Value> {
-    // Check if web-participant wallet exists
-    match get_wallet_for_command("web-participant", None) {
-        Ok(wallet) => {
-            let kaspa_addr = Address::new(
-                Prefix::Testnet,
-                Version::PubKey,
-                &wallet.keypair.public_key().serialize()[1..]
-            );
-            
-            Json(json!({
-                "exists": true,
-                "needs_funding": wallet.was_created, // Simple check: new wallets need funding
-                "kaspa_address": kaspa_addr.to_string(),
-                "was_created": wallet.was_created
-            }))
+    println!("🎭 MATRIX UI ACTION: User checking wallet status");
+    
+    // Check if web-participant wallet exists WITHOUT creating it
+    use crate::wallet::wallet_exists_for_command;
+    
+    if wallet_exists_for_command("web-participant") {
+        // Load existing wallet to get details
+        match get_wallet_for_command("web-participant", None) {
+            Ok(wallet) => {
+                let kaspa_addr = Address::new(
+                    Prefix::Testnet,
+                    Version::PubKey,
+                    &wallet.keypair.public_key().serialize()[1..]
+                );
+                
+                println!("✅ MATRIX UI SUCCESS: Existing wallet found - {}", kaspa_addr);
+                
+                Json(json!({
+                    "exists": true,
+                    "needs_funding": false, // Existing wallets assumed funded
+                    "kaspa_address": kaspa_addr.to_string(),
+                    "was_created": false
+                }))
+            }
+            Err(e) => {
+                println!("❌ MATRIX UI ERROR: Failed to load existing wallet - {}", e);
+                Json(json!({
+                    "exists": false,
+                    "needs_funding": true,
+                    "kaspa_address": "Wallet file corrupted - needs recreation",
+                    "error": format!("Failed to load wallet: {}", e)
+                }))
+            }
         }
-        Err(_) => {
-            Json(json!({
-                "exists": false,
-                "needs_funding": true,
-                "kaspa_address": "Will be created on first authentication"
-            }))
-        }
+    } else {
+        println!("⚠️ MATRIX UI INFO: No wallet found - user needs to create or import one");
+        Json(json!({
+            "exists": false,
+            "needs_funding": true,
+            "kaspa_address": "No wallet - user must create or import one"
+        }))
     }
 }
 
 async fn wallet_participant() -> Json<serde_json::Value> {
-    // Create a real participant peer wallet (like CLI does)
-    match get_wallet_for_command("web-participant", None) {
-        Ok(wallet) => {
-            let public_key_hex = hex::encode(wallet.keypair.public_key().serialize());
-            let kaspa_addr = Address::new(
-                Prefix::Testnet,
-                Version::PubKey,
-                &wallet.keypair.public_key().serialize()[1..]
-            );
-            
-            Json(json!({
-                "public_key": public_key_hex,
-                "kaspa_address": kaspa_addr.to_string(),
-                "was_created": wallet.was_created,
-                "needs_funding": true  // Always true for web participants for now
-            }))
+    println!("🎭 MATRIX UI ACTION: User requesting participant wallet info");
+    
+    // Check if wallet exists WITHOUT creating it
+    use crate::wallet::wallet_exists_for_command;
+    
+    if wallet_exists_for_command("web-participant") {
+        // Load existing wallet to get details
+        match get_wallet_for_command("web-participant", None) {
+            Ok(wallet) => {
+                let public_key_hex = hex::encode(wallet.keypair.public_key().serialize());
+                let kaspa_addr = Address::new(
+                    Prefix::Testnet,
+                    Version::PubKey,
+                    &wallet.keypair.public_key().serialize()[1..]
+                );
+                
+                println!("✅ MATRIX UI SUCCESS: Existing participant wallet - {}", kaspa_addr);
+                
+                Json(json!({
+                    "public_key": public_key_hex,
+                    "kaspa_address": kaspa_addr.to_string(),
+                    "was_created": false,
+                    "needs_funding": false  // Existing wallets assumed funded
+                }))
+            }
+            Err(e) => {
+                println!("❌ MATRIX UI ERROR: Failed to load participant wallet - {}", e);
+                Json(json!({
+                    "error": format!("Failed to load participant wallet: {}", e),
+                    "public_key": "error",
+                    "kaspa_address": "error",
+                    "was_created": false,
+                    "needs_funding": true
+                }))
+            }
         }
-        Err(e) => {
-            Json(json!({
-                "error": format!("Failed to create participant wallet: {}", e),
-                "public_key": "error",
-                "kaspa_address": "error",
-                "was_created": false,
-                "needs_funding": true
-            }))
-        }
+    } else {
+        println!("⚠️ MATRIX UI INFO: No participant wallet found - user needs to create one");
+        Json(json!({
+            "error": "No participant wallet found - user must create or import one",
+            "public_key": "none",
+            "kaspa_address": "none",
+            "was_created": false,
+            "needs_funding": true
+        }))
     }
 }
 
@@ -109,8 +146,12 @@ async fn wallet_participant_post(Json(req): Json<serde_json::Value>) -> Json<ser
     if let Some(private_key_hex) = req["private_key"].as_str() {
         let save_to_file = req["save_to_file"].as_bool().unwrap_or(false);
         
+        println!("🎭 MATRIX UI ACTION: User {} wallet with private key", 
+                 if save_to_file { "creating/importing and saving" } else { "importing temporarily" });
+        
         // Validate private key format
         if private_key_hex.len() != 64 {
+            println!("❌ MATRIX UI ERROR: Invalid private key length ({})", private_key_hex.len());
             return Json(json!({
                 "error": "Invalid private key length. Must be 64 hexadecimal characters.",
                 "success": false
@@ -121,6 +162,7 @@ async fn wallet_participant_post(Json(req): Json<serde_json::Value>) -> Json<ser
         let private_key_bytes = match hex::decode(private_key_hex) {
             Ok(bytes) => bytes,
             Err(_) => {
+                println!("❌ MATRIX UI ERROR: Invalid private key format (not hex)");
                 return Json(json!({
                     "error": "Invalid private key format. Must be hexadecimal.",
                     "success": false
@@ -129,6 +171,7 @@ async fn wallet_participant_post(Json(req): Json<serde_json::Value>) -> Json<ser
         };
         
         if private_key_bytes.len() != 32 {
+            println!("❌ MATRIX UI ERROR: Invalid private key length ({} bytes)", private_key_bytes.len());
             return Json(json!({
                 "error": "Invalid private key length. Must be 32 bytes.",
                 "success": false
@@ -136,7 +179,16 @@ async fn wallet_participant_post(Json(req): Json<serde_json::Value>) -> Json<ser
         }
         
         // Create wallet from private key
-        match get_wallet_for_command("web-participant", Some(private_key_hex)) {
+        let wallet_result = if save_to_file {
+            // Save to participant peer wallet file
+            use crate::wallet::KaspaAuthWallet;
+            KaspaAuthWallet::from_private_key_and_save(private_key_hex, "participant-peer-wallet.key")
+        } else {
+            // Use temporarily without saving
+            get_wallet_for_command("web-participant", Some(private_key_hex))
+        };
+        
+        match wallet_result {
             Ok(wallet) => {
                 let public_key_hex = hex::encode(wallet.keypair.public_key().serialize());
                 let kaspa_addr = Address::new(
@@ -144,6 +196,14 @@ async fn wallet_participant_post(Json(req): Json<serde_json::Value>) -> Json<ser
                     Version::PubKey,
                     &wallet.keypair.public_key().serialize()[1..]
                 );
+                
+                println!("✅ MATRIX UI SUCCESS: Wallet {} for address: {}", 
+                         if save_to_file { "created/imported and saved" } else { "created/imported temporarily" }, 
+                         kaspa_addr);
+                println!("🔑 Public Key: {}", public_key_hex);
+                if save_to_file {
+                    println!("💾 Saved to: .kaspa-auth/participant-peer-wallet.key");
+                }
                 
                 Json(json!({
                     "public_key": public_key_hex,
@@ -155,6 +215,7 @@ async fn wallet_participant_post(Json(req): Json<serde_json::Value>) -> Json<ser
                 }))
             }
             Err(e) => {
+                println!("❌ MATRIX UI ERROR: Failed to create wallet: {}", e);
                 Json(json!({
                     "error": format!("Failed to create wallet from private key: {}", e),
                     "success": false
@@ -368,27 +429,11 @@ pub async fn run_http_peer(provided_private_key: Option<&str>, port: u16) -> Res
     
     println!("🚀 HTTP Authentication Coordination Peer starting on port {}", port);
     println!("🔗 Starting kdapp blockchain engine...");
-    
-    // Show participant wallet funding information
-    match get_wallet_for_command("web-participant", None) {
-        Ok(wallet) => {
-            let participant_addr = Address::new(
-                Prefix::Testnet,
-                Version::PubKey,
-                &wallet.keypair.public_key().serialize()[1..]
-            );
-            println!();
-            println!("💰 PARTICIPANT WALLET FUNDING REQUIRED:");
-            println!("📍 Participant Address: {}", participant_addr);
-            println!("🚰 Get testnet funds: https://faucet.kaspanet.io/");
-            println!("💡 Participants must fund their own authentication transactions");
-            println!("🌐 Network: testnet-10");
-            println!();
-        }
-        Err(_e) => {
-            println!("⚠️  Participant wallet creation pending (will be created on first use)");
-        }
-    }
+    println!();
+    println!("🎭 MATRIX UI READY - Waiting for user actions...");
+    println!("💻 Web dashboard available at: http://localhost:{}/", port);
+    println!("🚀 Backend will respond to frontend wallet creation/import actions");
+    println!();
     
     // Start the blockchain listener in the background
     let auth_peer_clone = auth_peer.clone();
@@ -400,7 +445,6 @@ pub async fn run_http_peer(provided_private_key: Option<&str>, port: u16) -> Res
     
     // Start the HTTP coordination peer
     println!("🔗 kdapp engine started - HTTP coordination peer is now a real blockchain node!");
-    println!("🌐 Web dashboard available at: http://localhost:{}/", port);
     serve(listener, app.into_make_service()).await?;
     
     Ok(())

@@ -18,6 +18,7 @@ pub async fn revoke_session(
     State(state): State<PeerState>,
     Json(req): Json<RevokeSessionRequest>,
 ) -> Result<Json<RevokeSessionResponse>, StatusCode> {
+    println!("🎭 MATRIX UI ACTION: User requested session revocation (logout)");
     println!("🔄 DEBUG: RevokeSession request received - episode_id: {}, session_token: {}", req.episode_id, req.session_token);
     println!("🔍 DEBUG: Signature length: {}", req.signature.len());
     println!("📤 Sending RevokeSession command to blockchain...");
@@ -54,11 +55,11 @@ pub async fn revoke_session(
     // Verify that the session token matches the current episode session
     if let Some(ref current_token) = current_session_token {
         if req.session_token != *current_token {
-            println!("❌ Session token mismatch");
+            println!("❌ MATRIX UI ERROR: Session token mismatch for logout");
             return Err(StatusCode::BAD_REQUEST);
         }
     } else {
-        println!("❌ No active session found for episode {}", episode_id);
+        println!("❌ MATRIX UI ERROR: No active session found for logout");
         return Err(StatusCode::BAD_REQUEST);
     }
     
@@ -90,7 +91,7 @@ pub async fn revoke_session(
         };
         
         if entries.is_empty() {
-            println!("❌ No UTXOs found! Participant wallet needs funding.");
+            println!("❌ MATRIX UI ERROR: Participant wallet needs funding for session revocation");
             println!("💰 Fund this address: {}", participant_addr);
             println!("🚰 Get testnet funds: https://faucet.kaspanet.io/");
             return Err(StatusCode::SERVICE_UNAVAILABLE);
@@ -138,12 +139,12 @@ pub async fn revoke_session(
         utxo,
     ).await {
         Ok(tx_id) => {
-            println!("✅ RevokeSession transaction {} submitted successfully to blockchain via AuthHttpPeer!", tx_id);
+            println!("✅ MATRIX UI SUCCESS: Session revocation submitted - Transaction {}", tx_id);
             println!("📊 Transaction is now being processed by auth organizer peer's kdapp engine");
             (tx_id, "session_revocation_submitted".to_string())
         }
         Err(e) => {
-            println!("❌ RevokeSession submission failed via AuthHttpPeer: {}", e);
+            println!("❌ MATRIX UI ERROR: Session revocation failed - {}", e);
             ("error".to_string(), "session_revocation_failed".to_string())
         }
     };

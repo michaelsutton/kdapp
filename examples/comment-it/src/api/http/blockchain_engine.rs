@@ -199,6 +199,7 @@ pub struct HttpAuthHandler {
 
 impl EpisodeEventHandler<SimpleAuth> for HttpAuthHandler {
     fn on_initialize(&self, episode_id: EpisodeId, episode: &SimpleAuth) {
+        println!("🎭 MATRIX UI SUCCESS: Auth episode {} initialized on blockchain", episode_id);
         println!("🎬 Episode {} initialized on blockchain", episode_id);
         
         // Store episode in shared blockchain state
@@ -248,6 +249,7 @@ impl EpisodeEventHandler<SimpleAuth> for HttpAuthHandler {
         // Check what kind of update this is
         if episode.is_authenticated && episode.session_token.is_some() {
             // Authentication successful
+            println!("🎭 MATRIX UI SUCCESS: User authenticated successfully");
             let message = WebSocketMessage {
                 message_type: "authentication_successful".to_string(),
                 episode_id: Some(episode_id.into()),
@@ -261,6 +263,7 @@ impl EpisodeEventHandler<SimpleAuth> for HttpAuthHandler {
             if let Some(prev_episode) = previous_episode {
                 if prev_episode.is_authenticated && prev_episode.session_token.is_some() {
                     // Previous state was authenticated, now it's not -> session revoked
+                    println!("🎭 MATRIX UI SUCCESS: User session revoked (logout completed)");
                     let message = WebSocketMessage {
                         message_type: "session_revoked".to_string(),
                         episode_id: Some(episode_id.into()),
@@ -275,6 +278,7 @@ impl EpisodeEventHandler<SimpleAuth> for HttpAuthHandler {
             }
             
             // Challenge was issued (initial state)
+            println!("🎭 MATRIX UI SUCCESS: Authentication challenge issued to user");
             let message = WebSocketMessage {
                 message_type: "challenge_issued".to_string(),
                 episode_id: Some(episode_id.into()),
@@ -287,6 +291,7 @@ impl EpisodeEventHandler<SimpleAuth> for HttpAuthHandler {
     }
     
     fn on_rollback(&self, episode_id: EpisodeId, _episode: &SimpleAuth) {
+        println!("🎭 MATRIX UI ERROR: Authentication episode {} rolled back on blockchain", episode_id);
         println!("🔄 Episode {} rolled back on blockchain", episode_id);
     }
 }

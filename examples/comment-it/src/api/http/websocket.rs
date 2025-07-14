@@ -15,6 +15,7 @@ pub async fn websocket_handler(
 }
 
 async fn handle_socket(mut socket: WebSocket, state: PeerState) {
+    println!("🎭 MATRIX UI ACTION: WebSocket connection established");
     info!("New WebSocket connection established");
     
     // Subscribe to broadcast messages
@@ -35,8 +36,11 @@ async fn handle_socket(mut socket: WebSocket, state: PeerState) {
                         };
                         
                         if socket.send(Message::Text(json_str.into())).await.is_err() {
+                            println!("🎭 MATRIX UI ACTION: WebSocket connection closed");
                             info!("WebSocket connection closed");
                             break;
+                        } else {
+                            println!("🎭 MATRIX UI SUCCESS: WebSocket message sent to frontend");
                         }
                     }
                     Err(_) => {
@@ -54,6 +58,7 @@ async fn handle_socket(mut socket: WebSocket, state: PeerState) {
                         // For now, just continue
                     }
                     _ => {
+                        println!("🎭 MATRIX UI ACTION: WebSocket connection closed by client");
                         info!("WebSocket connection closed by client");
                         break;
                     }

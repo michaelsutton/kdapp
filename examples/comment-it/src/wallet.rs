@@ -1,4 +1,4 @@
-// src/wallet.rs - Unified Wallet Management System
+// src/wallet.rs - Unified Wallet Management System (from kaspa-auth)
 use secp256k1::Keypair;
 use std::path::{Path, PathBuf};
 use std::fs;
@@ -228,6 +228,51 @@ impl KaspaAuthWallet {
             was_created: false,
         })
     }
+    
+    /// Create wallet from private key and save to specific file
+    pub fn from_private_key_and_save(private_key_hex: &str, wallet_file: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        use secp256k1::{Secp256k1, SecretKey};
+        
+        println!("🔍 DEBUG: Importing private key: {}...", &private_key_hex[0..8]);
+        
+        let secp = Secp256k1::new();
+        let secret_bytes = hex::decode(private_key_hex)?;
+        println!("🔍 DEBUG: Decoded {} bytes from hex", secret_bytes.len());
+        
+        let secret_key = SecretKey::from_slice(&secret_bytes)?;
+        let keypair = Keypair::from_secret_key(&secp, &secret_key);
+        
+        let public_key_bytes = keypair.public_key().serialize();
+        println!("🔍 DEBUG: Full public key (33 bytes): {}", hex::encode(&public_key_bytes));
+        println!("🔍 DEBUG: Public key without prefix (32 bytes): {}", hex::encode(&public_key_bytes[1..]));
+        
+        // Create custom config with the specific file path
+        let mut config = WalletConfig::default();
+        config.keypair_file = config.wallet_dir.join(wallet_file);
+        
+        println!("🔍 DEBUG: Network ID: {}", config.network_id);
+        let network_prefix = Prefix::from(config.network_id);
+        println!("🔍 DEBUG: Network prefix: {:?}", network_prefix);
+        
+        // Create wallet directory if it doesn't exist
+        fs::create_dir_all(&config.wallet_dir)?;
+        
+        // Save the private key to the file
+        fs::write(&config.keypair_file, secret_key.as_ref())?;
+        
+        // Generate Kaspa address for display
+        let kaspa_address = Address::new(network_prefix, Version::PubKey, &keypair.public_key().serialize()[1..]);
+        
+        println!("💾 Wallet saved to: {}", config.keypair_file.display());
+        println!("🔑 Public Key: {}", hex::encode(keypair.public_key().serialize()));
+        println!("💰 Kaspa Address: {}", kaspa_address);
+        
+        Ok(Self {
+            keypair,
+            config,
+            was_created: false, // Not created this session, imported
+        })
+    }
 }
 
 /// Get wallet for any command with unified UX
@@ -241,4 +286,18 @@ pub fn get_wallet_for_command(command: &str, private_key: Option<&str>) -> Resul
             KaspaAuthWallet::load_for_command(command)
         }
     }
+}
+
+/// Check if wallet exists for command WITHOUT creating it
+pub fn wallet_exists_for_command(command: &str) -> bool {
+    let config = WalletConfig::default();
+    let wallet_file = match command {
+        "organizer-peer" | "http-peer" => config.wallet_dir.join("organizer-peer-wallet.key"),
+        "participant-peer" | "web-participant" | "authenticate" => config.wallet_dir.join("participant-peer-wallet.key"),
+        "server" | "http-server" => config.wallet_dir.join("organizer-peer-wallet.key"),
+        "client" => config.wallet_dir.join("participant-peer-wallet.key"),
+        _ => config.keypair_file,
+    };
+    
+    wallet_file.exists()
 }
