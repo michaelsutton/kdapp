@@ -1187,6 +1187,9 @@
             button.textContent = '[ CONNECTING TO KASPA... ]';
             button.disabled = true;
             
+            // Hide logout button at start of authentication flow
+            document.getElementById('logoutButton').style.display = 'none';
+            
             try {
                 // Step 1: Get wallet public key if needed
                 let walletData;
