@@ -22,7 +22,6 @@ use crate::api::http::websocket::websocket_handler;
 use axum::Json;
 use serde_json::json;
 use kaspa_addresses::{Address, Prefix, Version};
-use kaspa_wrpc_client::prelude::RpcApi;
 
 // Simple endpoint handlers
 async fn health() -> Json<serde_json::Value> {
@@ -48,7 +47,7 @@ async fn funding_info(State(state): State<PeerState>) -> Json<serde_json::Value>
     }))
 }
 
-async fn wallet_status(State(state): State<PeerState>) -> Json<serde_json::Value> {
+async fn wallet_status() -> Json<serde_json::Value> {
     // Check if web-participant wallet exists
     match get_wallet_for_command("web-participant", None) {
         Ok(wallet) => {
@@ -58,13 +57,9 @@ async fn wallet_status(State(state): State<PeerState>) -> Json<serde_json::Value
                 &wallet.keypair.public_key().serialize()[1..]
             );
             
-            // TODO: Check actual wallet balance (temporarily hardcoded for compilation)
-            let (balance, needs_funding) = (0u64, true);
-            
             Json(json!({
                 "exists": true,
-                "needs_funding": needs_funding,
-                "balance": balance,
+                "needs_funding": wallet.was_created, // Simple check: new wallets need funding
                 "kaspa_address": kaspa_addr.to_string(),
                 "was_created": wallet.was_created
             }))
@@ -174,37 +169,6 @@ async fn wallet_participant_post(Json(req): Json<serde_json::Value>) -> Json<ser
     }
 }
 
-async fn check_existing_episode(
-    State(state): State<PeerState>,
-    Json(req): Json<serde_json::Value>
-) -> Json<serde_json::Value> {
-    // Check if user already has authenticated episode with this organizer
-    let public_key = req["public_key"].as_str().unwrap_or("");
-    
-    if let Ok(episodes) = state.blockchain_episodes.lock() {
-        // Find any authenticated episode for this public key
-        for (episode_id, episode) in episodes.iter() {
-            if episode.is_authenticated && episode.session_token.is_some() {
-                if let Some(ref owner) = episode.owner {
-                    let owner_hex = hex::encode(owner.0.serialize());
-                    if owner_hex == public_key {
-                        return Json(json!({
-                            "has_existing_episode": true,
-                            "episode_id": episode_id,
-                            "session_token": episode.session_token,
-                            "authenticated": true
-                        }));
-                    }
-                }
-            }
-        }
-    }
-    
-    Json(json!({
-        "has_existing_episode": false,
-        "authenticated": false
-    }))
-}
 
 async fn sign_challenge(Json(req): Json<serde_json::Value>) -> Json<serde_json::Value> {
     // Extract challenge and handle participant wallet signing
@@ -393,7 +357,6 @@ pub async fn run_http_peer(provided_private_key: Option<&str>, port: u16) -> Res
         .route("/auth/verify", post(verify_auth))
         .route("/auth/revoke-session", post(revoke_session))
         .route("/auth/status/{episode_id}", get(get_status))
-        .route("/auth/check-existing", post(check_existing_episode))
         .route("/internal/episode-authenticated", post(episode_authenticated))
         .route("/internal/session-revoked", post(session_revoked))
         .fallback_service(ServeDir::new("public"))

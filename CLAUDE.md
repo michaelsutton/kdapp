@@ -775,4 +775,25 @@ These rules will save you from the "it compiles but doesn't work" trap that kill
   - Gemini's context window can handle entire codebases that would overflow Claude's context
   - When checking implementations, be specific about what you're looking for to get accurate results
 
+## 🚫 CARGO COMMANDS ARE USER RESPONSIBILITY
+
+**CRITICAL RULE**: Claude must NEVER run cargo commands. This includes:
+- ❌ `cargo build`
+- ❌ `cargo run`  
+- ❌ `cargo test`
+- ❌ `cargo check`
+- ❌ All other cargo subcommands
+
+**Why**: 
+- Compilation is the user's responsibility
+- Claude should focus on code generation and architecture
+- User controls when and how to build/run the project
+- Avoids unnecessary token usage on compilation output
+
+**What Claude CAN do**:
+- ✅ Read/write source code files
+- ✅ Analyze code structure and logic
+- ✅ Suggest build commands for user to run
+- ✅ Help debug compilation errors if user shares them
+
 

@@ -1142,75 +1142,6 @@
             document.getElementById('proceedNewButton').style.display = 'none';
         }
         
-        // Check if user already has authenticated episode
-        async function checkExistingEpisode() {
-            if (!currentWallet.publicKey || currentWallet.publicKey === 'from_file') {
-                // Need to get public key first
-                try {
-                    const response = await resilientFetch('/wallet-participant', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            private_key: "use_existing_file",
-                            save_to_file: false
-                        })
-                    });
-                    const walletData = await response.json();
-                    currentWallet.publicKey = walletData.public_key;
-                } catch (error) {
-                    console.error('Failed to get public key:', error);
-                    showAuthPanel();
-                    return;
-                }
-            }
-            
-            try {
-                const response = await resilientFetch('/auth/check-existing', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        public_key: currentWallet.publicKey
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if (data.has_existing_episode && data.authenticated) {
-                    // User already has authenticated episode
-                    currentEpisodeId = data.episode_id;
-                    currentSessionToken = data.session_token;
-                    isAuthenticated = true;
-                    
-                    // Show content access directly
-                    showAuthenticatedContent();
-                } else {
-                    // No existing episode, show auth panel
-                    showAuthPanel();
-                }
-            } catch (error) {
-                console.error('Failed to check existing episode:', error);
-                showAuthPanel();
-            }
-        }
-        
-        // Show authenticated content without re-authentication
-        function showAuthenticatedContent() {
-            document.getElementById('walletPanel').style.display = 'none';
-            document.getElementById('authPanel').style.display = 'none';
-            
-            // Show comment form directly
-            showCommentForm(true);
-            
-            // Update displays
-            document.getElementById('activeWalletAddress').textContent = currentWallet.kaspaAddress;
-            document.getElementById('walletAddress').textContent = currentWallet.kaspaAddress;
-            document.getElementById('authEpisodeDisplay').textContent = currentEpisodeId;
-            document.getElementById('logoutButton').style.display = 'block';
-            
-            typewriterEffect('AUTHENTICATED EPISODE FOUND. CONTENT UNLOCKED.', 
-                            document.querySelector('.connect-button').parentElement);
-        }
-        
         // Check for existing wallet and authenticated episodes on page load
         async function checkExistingWallet() {
             try {
@@ -1223,13 +1154,11 @@
                         privateKey: 'stored_in_file', // Placeholder
                         kaspaAddress: data.kaspa_address,
                         publicKey: 'from_file', // Will be fetched when needed
-                        wasCreated: false,
-                        needsFunding: data.needs_funding,
-                        balance: data.balance || 0
+                        wasCreated: data.was_created,
+                        needsFunding: data.needs_funding
                     };
                     
-                    // Check if user already has authenticated episode
-                    await checkExistingEpisode();
+                    showAuthPanel();
                 } else {
                     // No existing wallet, show wallet setup
                     document.getElementById('walletPanel').style.display = 'block';
@@ -1256,15 +1185,7 @@
             button.disabled = true;
             
             try {
-                // Step 1: Check funding status first
-                if (currentWallet.needsFunding) {
-                    button.textContent = '[ WALLET NEEDS FUNDING ]';
-                    typewriterEffect(`WALLET NEEDS FUNDING: ${currentWallet.kaspaAddress}. GET TESTNET FUNDS FROM FAUCET.`, button.parentElement);
-                    button.disabled = false;
-                    return;
-                }
-                
-                // Step 2: Get wallet public key if needed
+                // Step 1: Get wallet public key if needed
                 let walletData;
                 if (currentWallet.publicKey === 'from_file' || !currentWallet.publicKey) {
                     const walletResponse = await resilientFetch('/wallet-participant');
