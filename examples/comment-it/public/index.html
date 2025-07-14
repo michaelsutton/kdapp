@@ -859,6 +859,7 @@
         let currentSessionToken = null;
         let webSocket = null;
         let isAuthenticated = false;
+        let authenticationInProgress = false; // Prevent duplicate auth attempts
         let availableOrganizers = [
             { name: 'local-development', url: window.location.origin, priority: 1, enabled: true },
             { name: 'project-official', url: 'https://comments1.kaspa.community', priority: 2, enabled: false },
@@ -1177,11 +1178,18 @@
         
         // Real API functions
         async function connectWallet() {
+            // Prevent duplicate authentication attempts
+            if (authenticationInProgress) {
+                console.log('🚫 Authentication already in progress, ignoring duplicate request');
+                return;
+            }
+            
             if (!currentWallet) {
                 alert('No wallet available. Please create or import a wallet first.');
                 return;
             }
             
+            authenticationInProgress = true;
             const button = event.target;
             const originalText = button.textContent;
             button.textContent = '[ CONNECTING TO KASPA... ]';
@@ -1270,6 +1278,7 @@
                 }
                 
                 button.disabled = false;
+                authenticationInProgress = false; // Reset flag on error
             }
         }
         
@@ -1439,6 +1448,7 @@
             
             currentSessionToken = sessionToken;
             isAuthenticated = true;
+            authenticationInProgress = false; // Reset flag on success
             
             const button = document.getElementById('authButton');
             button.textContent = '[ EPISODE AUTHENTICATED ]';
@@ -1533,6 +1543,7 @@
             
             isAuthenticated = false;
             currentSessionToken = null;
+            authenticationInProgress = false; // Reset flag on session revocation
             
             // Hide comment form and logout button
             document.getElementById('commentForm').style.display = 'none';
@@ -1540,7 +1551,7 @@
             
             // Reset connect button
             const button = document.getElementById('authButton');
-            button.textContent = '[ LOGIN WITH KASPA ]';
+            button.textContent = '[ CREATE AUTH EPISODE ]';
             button.style.background = 'transparent';
             button.style.borderColor = 'var(--primary-teal)';
             button.style.color = 'var(--bright-teal)';
