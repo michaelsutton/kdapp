@@ -39,8 +39,6 @@ async fn handle_socket(mut socket: WebSocket, state: PeerState) {
                             println!("🎭 MATRIX UI ACTION: WebSocket connection closed");
                             info!("WebSocket connection closed");
                             break;
-                        } else {
-                            println!("🎭 MATRIX UI SUCCESS: WebSocket message sent to frontend");
                         }
                     }
                     Err(_) => {

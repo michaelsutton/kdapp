@@ -859,7 +859,6 @@
         let currentSessionToken = null;
         let webSocket = null;
         let isAuthenticated = false;
-        let authenticationInProgress = false; // Prevent duplicate auth attempts
         let availableOrganizers = [
             { name: 'local-development', url: window.location.origin, priority: 1, enabled: true },
             { name: 'project-official', url: 'https://comments1.kaspa.community', priority: 2, enabled: false },
@@ -1178,18 +1177,10 @@
         
         // Real API functions
         async function connectWallet() {
-            // Prevent duplicate authentication attempts
-            if (authenticationInProgress) {
-                console.log('🚫 Authentication already in progress, ignoring duplicate request');
-                return;
-            }
-            
             if (!currentWallet) {
                 alert('No wallet available. Please create or import a wallet first.');
                 return;
             }
-            
-            authenticationInProgress = true;
             const button = event.target;
             const originalText = button.textContent;
             button.textContent = '[ CONNECTING TO KASPA... ]';
@@ -1278,7 +1269,6 @@
                 }
                 
                 button.disabled = false;
-                authenticationInProgress = false; // Reset flag on error
             }
         }
         
@@ -1390,14 +1380,6 @@
         // Handle challenge received via WebSocket
         async function handleChallenge(challenge) {
             console.log('🎲 Challenge received:', challenge);
-            
-            // Prevent duplicate challenge handling
-            if (authenticationInProgress) {
-                console.log('🚫 Challenge handling already in progress, ignoring duplicate');
-                return;
-            }
-            
-            authenticationInProgress = true; // Set flag when challenge handling starts
             const button = document.getElementById('authButton');
             button.textContent = '[ SIGNING CHALLENGE... ]';
             
@@ -1445,7 +1427,6 @@
                 console.error('Challenge handling failed:', error);
                 button.textContent = '[ ERROR - TRY AGAIN ]';
                 button.disabled = false;
-                authenticationInProgress = false; // Reset flag on challenge error
             }
         }
         
@@ -1456,7 +1437,6 @@
             
             currentSessionToken = sessionToken;
             isAuthenticated = true;
-            authenticationInProgress = false; // Reset flag on success
             
             const button = document.getElementById('authButton');
             button.textContent = '[ EPISODE AUTHENTICATED ]';
@@ -1551,7 +1531,6 @@
             
             isAuthenticated = false;
             currentSessionToken = null;
-            authenticationInProgress = false; // Reset flag on session revocation
             
             // Hide comment form and logout button
             document.getElementById('commentForm').style.display = 'none';

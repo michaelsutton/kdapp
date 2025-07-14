@@ -271,8 +271,9 @@ impl EpisodeEventHandler<SimpleAuth> for HttpAuthHandler {
                         challenge: episode.challenge.clone(),
                         session_token: None,
                     };
+                    let receiver_count = self.websocket_tx.receiver_count();
                     let _ = self.websocket_tx.send(message);
-                    println!("📡 Sent session_revoked WebSocket message for episode {}", episode_id);
+                    println!("📡 Sent session_revoked WebSocket message for episode {} to {} client(s)", episode_id, receiver_count);
                     return; // Don't send challenge_issued message
                 }
             }
