@@ -37,11 +37,24 @@ pub async fn verify_auth(
     };
     
     let participant_pubkey = match episode {
-        Some(ep) => ep.owner.unwrap_or_else(|| {
-            println!("❌ Episode has no owner public key");
-            // This shouldn't happen, but let's continue anyway
-            PubKey(secp256k1::PublicKey::from_slice(&[2; 33]).unwrap())
-        }),
+        Some(ep) => {
+            // 🚨 CRITICAL: Check episode state BEFORE submitting duplicate transactions
+            if ep.is_authenticated {
+                println!("🔄 Episode {} already authenticated - blocking duplicate transaction submission", episode_id);
+                return Ok(Json(VerifyResponse {
+                    episode_id,
+                    authenticated: true,
+                    status: "already_authenticated".to_string(),
+                    transaction_id: None,
+                }));
+            }
+            
+            ep.owner.unwrap_or_else(|| {
+                println!("❌ Episode has no owner public key");
+                // This shouldn't happen, but let's continue anyway
+                PubKey(secp256k1::PublicKey::from_slice(&[2; 33]).unwrap())
+            })
+        },
         None => {
             println!("❌ Episode {} not found in blockchain state", episode_id);
             return Err(StatusCode::NOT_FOUND);
