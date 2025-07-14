@@ -949,6 +949,60 @@ Remember: **In kaspa-auth, episode.rs is the ONLY source of session tokens**
 
 Keep them separate and correctly mapped!
 
+## 🔧 DEVELOPMENT HELL FIXING - WALLET RESET PATTERN
+
+### 🚨 CRITICAL: When Authentication Gets Stuck
+
+**Symptom**: Wallet shows "NEEDS FUNDING" despite having 999+ TKAS
+
+**Root Cause**: Wallet file is stuck in "newly created" state (was_created=true)
+
+**NUCLEAR SOLUTION** (Always Works):
+```bash
+# Delete the problematic wallet file
+rm .kaspa-auth/participant-peer-wallet.key
+
+# Restart backend
+cargo run --bin comment-it http-peer --port 8080
+
+# Refresh frontend - wallet creation/import options will appear
+# Import your funded wallet using private key
+```
+
+### 🎯 Why This Happens
+
+**Wallet State Corruption**:
+- Wallet file stores `was_created=true` permanently
+- Even funded wallets show "needs funding" 
+- Frontend/backend state desync
+- No automatic recovery mechanism
+
+**The Wallet is Always a Jumper**:
+- Persistent state in `.kaspa-auth/` directory
+- State corruption requires manual reset
+- This is the fastest development fix
+
+### 🔄 Development Workflow
+
+```bash
+# When stuck in any wallet state issue:
+1. rm .kaspa-auth/participant-peer-wallet.key
+2. Restart backend
+3. Refresh frontend  
+4. Re-import funded wallet
+5. Authentication flow works
+```
+
+### 📋 Add This to Development Checklist
+
+**Before debugging complex state issues:**
+- [ ] Try wallet reset first
+- [ ] Check if wallet file is corrupted
+- [ ] Verify funding status after reset
+- [ ] Test authentication flow
+
+**Remember**: Wallet reset is faster than debugging state synchronization issues!
+
 ## 🚫 CARGO COMMANDS ARE USER RESPONSIBILITY
 
 **CRITICAL RULE**: Claude must NEVER run cargo commands. This includes:
