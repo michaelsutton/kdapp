@@ -1233,6 +1233,9 @@
                     
                     button.textContent = '[ WAITING FOR CHALLENGE... ]';
                     
+                    // Hide logout button during challenge wait
+                    document.getElementById('logoutButton').style.display = 'none';
+                    
                     // Connect WebSocket for real-time updates
                     connectWebSocket();
                     
