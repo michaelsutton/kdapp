@@ -1,4 +1,42 @@
- 🎯 KDAPP-COMPATIBLE USER IDENTITY SYSTEM
+# 📋 NEXT SESSION ROADMAP - UPDATE AFTER EACH SESSION
+
+## 🚀 **CURRENT PRIORITY: Web MVP Commenting System**
+
+### **Phase 1: Fix Current State Issues (30 mins)**
+- ✅ Fix any remaining WebSocket sync issues
+- ✅ Ensure logout button shows correctly  
+- ✅ Test wallet creation/import flows
+
+### **Phase 2: Implement Commenting (2-3 hours)**
+- 🎯 Add comment episode creation
+- 🎯 Display comments from blockchain
+- 🎯 Matrix-themed comment UI
+- 🎯 Anonymous vs authenticated commenting
+
+### **Phase 3: Polish MVP (1 hour)**
+- 🎯 Real-time comment updates via WebSocket
+- 🎯 Basic comment threading
+- 🎯 Mobile-responsive Matrix UI
+
+## 🤖 **AUTO-COMMIT PROTOCOL**
+Claude will automatically commit progress:
+- Every major feature completion
+- Every bug fix
+- Every UI improvement
+- User doesn't need to remind about commits
+
+## 🎯 **MVP SUCCESS CRITERIA**
+1. ✅ Authentication (DONE)
+2. 🎯 Post comments to blockchain
+3. 🎯 Read comments from blockchain  
+4. 🎯 Real-time updates
+5. 🎯 Beautiful Matrix UI
+
+**STATE MANAGEMENT DECISION: KEEP VANILLA JS for MVP speed**
+
+---
+
+# 🎯 KDAPP-COMPATIBLE USER IDENTITY SYSTEM
 
   ✅ ARCHITECTURALLY SOUND APPROACHES
 
