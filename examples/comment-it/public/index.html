@@ -685,7 +685,7 @@
                 </button>
             </div>
             
-            <button class="connect-button" onclick="connectWallet()">
+            <button class="connect-button" id="authButton" onclick="connectWallet()">
                 [ CREATE AUTH EPISODE ]
             </button>
             <button class="connect-button" id="logoutButton" onclick="logout()" style="display: none; margin-top: 10px; background: var(--error); border-color: var(--error);">
@@ -1346,7 +1346,7 @@
         async function requestChallengeAfterEpisodeCreation() {
             console.log('🎯 Episode created, requesting challenge...');
             
-            const button = document.querySelector('.connect-button');
+            const button = document.getElementById('authButton');
             button.textContent = '[ REQUESTING CHALLENGE... ]';
             
             try {
@@ -1380,7 +1380,7 @@
         async function handleChallenge(challenge) {
             console.log('🎲 Challenge received:', challenge);
             
-            const button = document.querySelector('.connect-button');
+            const button = document.getElementById('authButton');
             button.textContent = '[ SIGNING CHALLENGE... ]';
             
             try {
@@ -1438,7 +1438,7 @@
             currentSessionToken = sessionToken;
             isAuthenticated = true;
             
-            const button = document.querySelector('.connect-button');
+            const button = document.getElementById('authButton');
             button.textContent = '[ EPISODE AUTHENTICATED ]';
             button.style.background = 'var(--success)';
             button.style.borderColor = 'var(--success)';
@@ -1516,7 +1516,7 @@
         function handleAuthenticationFailed(error) {
             console.error('❌ Authentication failed:', error);
             
-            const button = document.querySelector('.connect-button');
+            const button = document.getElementById('authButton');
             button.textContent = '[ AUTHENTICATION FAILED ]';
             button.style.background = 'var(--error)';
             button.style.borderColor = 'var(--error)';
@@ -1537,7 +1537,7 @@
             document.getElementById('logoutButton').style.display = 'none';
             
             // Reset connect button
-            const button = document.querySelector('.connect-button');
+            const button = document.getElementById('authButton');
             button.textContent = '[ LOGIN WITH KASPA ]';
             button.style.background = 'transparent';
             button.style.borderColor = 'var(--primary-teal)';
