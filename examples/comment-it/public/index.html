@@ -1188,7 +1188,11 @@
             button.disabled = true;
             
             // Hide logout button at start of authentication flow
-            document.getElementById('logoutButton').style.display = 'none';
+            const logoutBtn = document.getElementById('logoutButton');
+            if (logoutBtn) {
+                logoutBtn.style.display = 'none';
+                console.log('🔍 DEBUG: Logout button hidden at auth start');
+            }
             
             try {
                 // Step 1: Get wallet public key if needed
@@ -1237,7 +1241,11 @@
                     button.textContent = '[ WAITING FOR CHALLENGE... ]';
                     
                     // Hide logout button during challenge wait
-                    document.getElementById('logoutButton').style.display = 'none';
+                    const logoutBtn = document.getElementById('logoutButton');
+                    if (logoutBtn) {
+                        logoutBtn.style.display = 'none';
+                        console.log('🔍 DEBUG: Logout button hidden during challenge wait');
+                    }
                     
                     // Connect WebSocket for real-time updates
                     connectWebSocket();
@@ -1425,6 +1433,7 @@
         // Handle successful authentication
         function handleAuthenticated(sessionToken) {
             console.log('✅ Authentication successful! Session token:', sessionToken);
+            console.log('🔍 DEBUG: handleAuthenticated called - about to show logout button');
             
             currentSessionToken = sessionToken;
             isAuthenticated = true;
@@ -1436,7 +1445,11 @@
             button.style.color = 'var(--bg-black)';
             
             // Show logout button
-            document.getElementById('logoutButton').style.display = 'block';
+            const logoutBtn = document.getElementById('logoutButton');
+            if (logoutBtn) {
+                logoutBtn.style.display = 'block';
+                console.log('🔍 DEBUG: Logout button shown after authentication success');
+            }
             
             // Show comment form with authenticated features
             showCommentForm(true);
