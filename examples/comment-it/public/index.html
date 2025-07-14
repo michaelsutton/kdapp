@@ -1335,7 +1335,9 @@
                     break;
                     
                 case 'session_revoked':
-                    if (message.session_token === currentSessionToken) {
+                    // Session revoked for current episode - always handle it
+                    if (message.episode_id === currentEpisodeId) {
+                        console.log('🔍 DEBUG: Session revoked for current episode');
                         handleSessionRevoked();
                     }
                     break;
