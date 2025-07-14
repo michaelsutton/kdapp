@@ -1391,6 +1391,13 @@
         async function handleChallenge(challenge) {
             console.log('🎲 Challenge received:', challenge);
             
+            // Prevent duplicate challenge handling
+            if (authenticationInProgress) {
+                console.log('🚫 Challenge handling already in progress, ignoring duplicate');
+                return;
+            }
+            
+            authenticationInProgress = true; // Set flag when challenge handling starts
             const button = document.getElementById('authButton');
             button.textContent = '[ SIGNING CHALLENGE... ]';
             
@@ -1438,6 +1445,7 @@
                 console.error('Challenge handling failed:', error);
                 button.textContent = '[ ERROR - TRY AGAIN ]';
                 button.disabled = false;
+                authenticationInProgress = false; // Reset flag on challenge error
             }
         }
         
