@@ -859,6 +859,7 @@
         let currentSessionToken = null;
         let webSocket = null;
         let isAuthenticated = false;
+        let isProcessingChallenge = false; // Prevent duplicate challenge processing
         let availableOrganizers = [
             { name: 'local-development', url: window.location.origin, priority: 1, enabled: true },
             { name: 'project-official', url: 'https://comments1.kaspa.community', priority: 2, enabled: false },
@@ -1316,6 +1317,11 @@
             
             switch (message.type) {
                 case 'episode_created':
+                    // Only ignore if we've already processed this specific episode AND we're not starting fresh
+                    if (currentEpisodeId === message.episode_id && isProcessingChallenge) {
+                        console.log('🔄 Duplicate episode_created message ignored - already processing');
+                        return;
+                    }
                     console.log('🎯 Episode created, requesting challenge...');
                     currentEpisodeId = message.episode_id; // Ensure episode ID is set
                     // Only request challenge if we're not already authenticated
@@ -1326,6 +1332,12 @@
                     
                 case 'challenge_issued':
                     if (message.episode_id === currentEpisodeId && !isAuthenticated) {
+                        // Prevent duplicate challenge handling
+                        const button = document.getElementById('authButton');
+                        if (button.textContent.includes('SIGNING CHALLENGE')) {
+                            console.log('🔄 Duplicate challenge_issued message ignored - already processing');
+                            return;
+                        }
                         handleChallenge(message.challenge);
                     }
                     break;
@@ -1354,6 +1366,13 @@
         
         // Automatically request challenge after episode creation
         async function requestChallengeAfterEpisodeCreation() {
+            // Prevent duplicate challenge requests
+            if (isProcessingChallenge) {
+                console.log('🔄 Challenge request already in progress - ignoring duplicate');
+                return;
+            }
+            
+            isProcessingChallenge = true;
             console.log('🎯 Episode created, requesting challenge...');
             
             const button = document.getElementById('authButton');
@@ -1384,6 +1403,7 @@
                 console.error('❌ Challenge request failed:', error);
                 button.textContent = '[ CHALLENGE REQUEST FAILED ]';
                 button.disabled = false; // Re-enable on error
+                isProcessingChallenge = false; // Reset state lock
                 typewriterEffect(`CHALLENGE ERROR: ${error.message}`, button.parentElement);
             }
         }
@@ -1447,6 +1467,7 @@
                 console.error('Challenge handling failed:', error);
                 button.textContent = '[ ERROR - TRY AGAIN ]';
                 button.disabled = false;
+                isProcessingChallenge = false; // Reset state lock on error
             }
         }
         
@@ -1457,6 +1478,7 @@
             
             currentSessionToken = sessionToken;
             isAuthenticated = true;
+            isProcessingChallenge = false; // Reset state lock on success
             
             const button = document.getElementById('authButton');
             button.textContent = '[ EPISODE AUTHENTICATED ]';
@@ -1552,6 +1574,7 @@
             
             isAuthenticated = false;
             currentSessionToken = null;
+            isProcessingChallenge = false; // Reset state lock
             
             // Hide comment form and logout button
             document.getElementById('commentForm').style.display = 'none';
@@ -1565,7 +1588,12 @@
             button.style.color = 'var(--bright-teal)';
             button.disabled = false;
             
-            typewriterEffect('SESSION REVOKED. PLEASE AUTHENTICATE AGAIN.', button.parentElement);
+            typewriterEffect('SESSION REVOKED. RELOADING PAGE FOR FRESH START...', button.parentElement);
+            
+            // Force browser restart after logout to clear all state
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
         }
         
         // Show comment form with different features for authenticated vs anonymous
