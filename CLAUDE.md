@@ -1,5 +1,41 @@
 # Kaspa Auth - Episode-First Implementation
 
+## 🚀 PRIORITY: FIRST KDAPP FRAMEWORK PR - CRITICAL BUG FIX
+
+### 🎯 **READY TO SUBMIT: Proxy.rs WebSocket Crash Fix**
+- **Issue**: kdapp proxy panics on WebSocket disconnections (proxy.rs:86)
+- **Root Cause**: `kaspad.get_virtual_chain_from_block(sink, true).await.unwrap()`
+- **Impact**: Backend crashes with "RpcSubsystem(WebSocket disconnected)" 
+- **Fix**: Replaced 8 `unwrap()` calls with proper error handling
+- **Status**: ✅ FIXED and committed (commit ca64ee6)
+- **Testing**: Backend now survives network interruptions gracefully
+- **PR Value**: Production-critical fix affecting all kdapp users
+
+### 🎖️ **WHY THIS IS A PERFECT FIRST PR:**
+1. **Clear Bug**: Reproducible crash affecting real users
+2. **Solid Fix**: Proper error handling with logging
+3. **Well Documented**: Comprehensive commit message
+4. **Framework Impact**: Benefits entire kdapp ecosystem
+5. **Low Risk**: Only improves stability, no behavior changes
+
+### 📋 **PR SUBMISSION CHECKLIST:**
+- [x] Bug identified and root cause found
+- [x] Fix implemented with proper error handling
+- [x] Commit message written with full context
+- [x] Testing completed (backend stability verified)
+- [ ] Create fork of michaelsutton/kdapp repository
+- [ ] Push fix to feature branch
+- [ ] Create pull request with detailed description
+- [ ] Reference issue #[number] if exists on GitHub
+
+### 🏆 **POTENTIAL IMPACT:**
+- First community contribution to kdapp framework
+- Establishes reputation as reliable contributor
+- Opens door for future framework improvements
+- Demonstrates real-world kdapp development experience
+
+---
+
 ## 🌐 FUNDAMENTAL: kdapp is Peer-to-Peer, NOT Client-Server
 
 ### ❌ WRONG Hierarchical Thinking:
@@ -604,6 +640,26 @@ Remember: A broken auth system is worse than no auth system.
 These rules will save you from the "it compiles but doesn't work" trap that kills so many crypto projects! 🔐
 
 # Using Gemini CLI for Large Codebase Analysis
+
+## 🚀 **SPECIAL GEMINI TASK: PR PREPARATION REVIEW**
+
+### 🎯 **Critical kdapp Framework Fix Ready for PR**
+Use Gemini to review our proxy.rs WebSocket crash fix before submitting PR:
+
+```bash
+# Review the fix comprehensively
+gemini -p "@kdapp/src/proxy.rs @examples/comment-it/CLAUDE.md Review the WebSocket crash fix in proxy.rs. Is this ready for a pull request to michaelsutton/kdapp? Check: 1) Error handling completeness, 2) Logging appropriateness, 3) Potential edge cases, 4) Code style consistency, 5) Impact on existing functionality"
+
+# Cross-reference with original issue
+gemini -p "@kdapp/src/proxy.rs Analyze the proxy.rs file for any remaining unwrap() calls or potential panic points that could crash the kdapp framework"
+
+# Generate PR description
+gemini -p "@kdapp/src/proxy.rs @examples/comment-it/CLAUDE.md Generate a comprehensive GitHub pull request description for the WebSocket crash fix, including problem statement, solution overview, technical details, and testing recommendations"
+```
+
+### 🏆 **Confidence Building**: Let Gemini validate our fix quality before PR submission
+
+---
 
   When analyzing large codebases or multiple files that might exceed context limits, use the Gemini CLI with its massive
   context window. Use `gemini -p` to leverage Google Gemini's large context capacity.
