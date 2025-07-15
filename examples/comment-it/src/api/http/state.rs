@@ -1,6 +1,6 @@
 // src/api/http/state.rs
 use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tokio::sync::broadcast;
 use secp256k1::Keypair;
 use kdapp::generator::TransactionGenerator;
@@ -26,6 +26,7 @@ pub struct PeerState {
     pub transaction_generator: Arc<TransactionGenerator>,
     pub kaspad_client: Option<Arc<KaspaRpcClient>>,  // NEW - for transaction submission
     pub auth_http_peer: Option<Arc<crate::api::http::blockchain_engine::AuthHttpPeer>>, // Reference to the main peer
+    pub pending_requests: Arc<Mutex<HashSet<String>>>,  // NEW - Track pending requests by operation+episode_id
 }
 
 // WebSocket message for real-time blockchain updates

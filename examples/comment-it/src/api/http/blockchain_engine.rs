@@ -1,6 +1,6 @@
 // src/api/http/blockchain_engine.rs
 use std::sync::{Arc, atomic::AtomicBool, mpsc};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tokio::sync::broadcast;
 use secp256k1::Keypair;
 use kdapp::{
@@ -62,6 +62,7 @@ impl AuthHttpPeer {
             transaction_generator,
             kaspad_client,  // NEW - for actual transaction submission
             auth_http_peer: None, // Will be set after AuthHttpPeer is created
+            pending_requests: Arc::new(std::sync::Mutex::new(HashSet::new())),  // NEW - request deduplication
         };
         
         let exit_signal = Arc::new(AtomicBool::new(false));

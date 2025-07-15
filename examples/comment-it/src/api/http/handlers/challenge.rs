@@ -13,6 +13,8 @@ use crate::api::http::{
     state::PeerState,
 };
 use crate::core::{episode::SimpleAuth, commands::AuthCommand};
+use std::sync::Arc;
+use std::collections::HashSet;
 
 pub async fn request_challenge(
     State(state): State<PeerState>,
@@ -20,6 +22,22 @@ pub async fn request_challenge(
 ) -> Result<Json<ChallengeResponse>, StatusCode> {
     println!("🎭 MATRIX UI ACTION: User requested authentication challenge");
     println!("📨 Sending RequestChallenge command to blockchain...");
+    
+    // 🚨 CRITICAL: Request-level deduplication to prevent race conditions
+    let request_key = format!("challenge_{}", req.episode_id);
+    {
+        let mut pending = state.pending_requests.lock().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        if pending.contains(&request_key) {
+            println!("🔄 Duplicate challenge request for episode {} blocked - request already in progress", req.episode_id);
+            return Ok(Json(ChallengeResponse {
+                episode_id: req.episode_id,
+                nonce: "request_in_progress".to_string(),
+                transaction_id: None,
+                status: "request_in_progress".to_string(),
+            }));
+        }
+        pending.insert(request_key.clone());
+    }
     
     // Parse the participant's public key (like CLI does)
     let participant_pubkey = match hex::decode(&req.public_key) {
@@ -36,6 +54,12 @@ pub async fn request_challenge(
             println!("❌ Hex decode failed: {}", e);
             return Err(StatusCode::BAD_REQUEST);
         },
+    };
+    
+    // Ensure we remove the request key when done (RAII-style cleanup)
+    let _cleanup_guard = RequestCleanupGuard {
+        pending_requests: state.pending_requests.clone(),
+        request_key: request_key.clone(),
     };
     
     // 🎯 TRUE P2P: Participant funds their own transactions (like CLI)
@@ -148,4 +172,19 @@ pub async fn request_challenge(
         transaction_id: Some(transaction_id),
         status: status,
     }))
+}
+
+/// RAII cleanup guard to remove pending request when function exits
+struct RequestCleanupGuard {
+    pending_requests: Arc<std::sync::Mutex<HashSet<String>>>,
+    request_key: String,
+}
+
+impl Drop for RequestCleanupGuard {
+    fn drop(&mut self) {
+        if let Ok(mut pending) = self.pending_requests.lock() {
+            pending.remove(&self.request_key);
+            println!("🧹 Cleaned up pending request: {}", self.request_key);
+        }
+    }
 }

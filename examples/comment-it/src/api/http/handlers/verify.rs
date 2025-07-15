@@ -13,6 +13,8 @@ use crate::api::http::{
     state::PeerState,
 };
 use crate::core::{episode::SimpleAuth, commands::AuthCommand};
+use std::sync::Arc;
+use std::collections::HashSet;
 
 pub async fn verify_auth(
     State(state): State<PeerState>,
@@ -26,6 +28,28 @@ pub async fn verify_auth(
     // Parse episode_id from request (u64)
     let episode_id: u64 = req.episode_id;
     
+    // 🚨 CRITICAL: Request-level deduplication to prevent race conditions
+    let request_key = format!("verify_{}", episode_id);
+    {
+        let mut pending = state.pending_requests.lock().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        if pending.contains(&request_key) {
+            println!("🔄 Duplicate verify request for episode {} blocked - request already in progress", episode_id);
+            return Ok(Json(VerifyResponse {
+                episode_id,
+                authenticated: false,
+                status: "request_in_progress".to_string(),
+                transaction_id: None,
+            }));
+        }
+        pending.insert(request_key.clone());
+    }
+    
+    // Ensure we remove the request key when done (RAII-style cleanup)
+    let _cleanup_guard = RequestCleanupGuard {
+        pending_requests: state.pending_requests.clone(),
+        request_key: request_key.clone(),
+    };
+    
     // Find the participant public key from the episode
     let episode = match state.blockchain_episodes.lock() {
         Ok(episodes) => {
@@ -38,11 +62,24 @@ pub async fn verify_auth(
     };
     
     let participant_pubkey = match episode {
-        Some(ep) => ep.owner.unwrap_or_else(|| {
-            println!("❌ Episode has no owner public key");
-            // This shouldn't happen, but let's continue anyway
-            PubKey(secp256k1::PublicKey::from_slice(&[2; 33]).unwrap())
-        }),
+        Some(ep) => {
+            // 🚨 CRITICAL: Check episode state BEFORE submitting duplicate transactions
+            if ep.is_authenticated {
+                println!("🔄 Episode {} already authenticated - blocking duplicate transaction submission", episode_id);
+                return Ok(Json(VerifyResponse {
+                    episode_id,
+                    authenticated: true,
+                    status: "already_authenticated".to_string(),
+                    transaction_id: None,
+                }));
+            }
+            
+            ep.owner.unwrap_or_else(|| {
+                println!("❌ Episode has no owner public key");
+                // This shouldn't happen, but let's continue anyway
+                PubKey(secp256k1::PublicKey::from_slice(&[2; 33]).unwrap())
+            })
+        },
         None => {
             println!("❌ Episode {} not found in blockchain state", episode_id);
             return Err(StatusCode::NOT_FOUND);
@@ -154,4 +191,19 @@ pub async fn verify_auth(
         status,
         transaction_id: Some(transaction_id),
     }))
+}
+
+/// RAII cleanup guard to remove pending request when function exits
+struct RequestCleanupGuard {
+    pending_requests: Arc<std::sync::Mutex<HashSet<String>>>,
+    request_key: String,
+}
+
+impl Drop for RequestCleanupGuard {
+    fn drop(&mut self) {
+        if let Ok(mut pending) = self.pending_requests.lock() {
+            pending.remove(&self.request_key);
+            println!("🧹 Cleaned up pending request: {}", self.request_key);
+        }
+    }
 }

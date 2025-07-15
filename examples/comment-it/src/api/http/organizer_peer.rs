@@ -2,6 +2,7 @@
 use axum::{routing::{get, post}, Router, extract::State};
 use axum::serve;
 use std::sync::Arc;
+use std::collections::HashSet;
 use tokio::sync::broadcast;
 use crate::wallet::get_wallet_for_command;
 use tower_http::cors::{CorsLayer, Any};
@@ -397,6 +398,7 @@ pub async fn run_http_peer(provided_private_key: Option<&str>, port: u16) -> Res
         transaction_generator: auth_peer.peer_state.transaction_generator.clone(),
         kaspad_client: auth_peer.peer_state.kaspad_client.clone(),
         auth_http_peer: Some(auth_peer.clone()), // Pass the Arc<AuthHttpPeer> here
+        pending_requests: auth_peer.peer_state.pending_requests.clone(),
     };
     
     let cors = CorsLayer::new()

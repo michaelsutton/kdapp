@@ -742,7 +742,7 @@
                     <div class="comment-body">
                         The Kaspa blockchain never forgets. Our episode messages are immutable now.
                     </div>
-                    <a href="#" class="verify-link">[ VERIFY ON KASPA EXPLORER → ]</a>
+                    <a href="https://explorer-tn10.kaspa.org/addresses/kaspatest:qzf2gqefp9xsws75380uwzgnah4mttmavgkqv8kx6kam688rwc6wjar5dzz7u" target="_blank" class="verify-link">[ VERIFY ON KASPA EXPLORER → ]</a>
                 </div>
             </div>
         </div>
@@ -866,6 +866,12 @@
         ];
         let currentOrganizerIndex = 0;
         let currentWallet = null;
+        
+        // Helper function to truncate Kaspa addresses for display
+        function truncateKaspaAddress(address) {
+            if (!address || address.length <= 28) return address;
+            return address.substring(0, 20) + '...' + address.substring(address.length - 8);
+        }
         
         // Removed - now in DOMContentLoaded
         
@@ -1096,9 +1102,10 @@
             // Show auth panel
             document.getElementById('authPanel').style.display = 'block';
             
-            // Update active wallet display
-            document.getElementById('activeWalletAddress').textContent = currentWallet.kaspaAddress;
-            document.getElementById('walletAddress').textContent = currentWallet.kaspaAddress;
+            // Update active wallet display with truncated address
+            const truncatedAddress = truncateKaspaAddress(currentWallet.kaspaAddress);
+            document.getElementById('activeWalletAddress').textContent = truncatedAddress;
+            document.getElementById('walletAddress').textContent = truncatedAddress;
             
             // Show funding info if wallet was just created
             if (currentWallet.wasCreated) {
@@ -1311,18 +1318,20 @@
                 case 'episode_created':
                     console.log('🎯 Episode created, requesting challenge...');
                     currentEpisodeId = message.episode_id; // Ensure episode ID is set
-                    // Automatically request challenge after episode creation
-                    requestChallengeAfterEpisodeCreation();
+                    // Only request challenge if we're not already authenticated
+                    if (!isAuthenticated) {
+                        requestChallengeAfterEpisodeCreation();
+                    }
                     break;
                     
                 case 'challenge_issued':
-                    if (message.episode_id === currentEpisodeId) {
+                    if (message.episode_id === currentEpisodeId && !isAuthenticated) {
                         handleChallenge(message.challenge);
                     }
                     break;
                     
                 case 'authentication_successful':
-                    if (message.episode_id === currentEpisodeId) {
+                    if (message.episode_id === currentEpisodeId && !isAuthenticated) {
                         handleAuthenticated(message.session_token);
                     }
                     break;
@@ -1349,6 +1358,7 @@
             
             const button = document.getElementById('authButton');
             button.textContent = '[ REQUESTING CHALLENGE... ]';
+            button.disabled = true; // Prevent multiple clicks
             
             try {
                 const response = await resilientFetch('/auth/request-challenge', {
@@ -1373,6 +1383,7 @@
             } catch (error) {
                 console.error('❌ Challenge request failed:', error);
                 button.textContent = '[ CHALLENGE REQUEST FAILED ]';
+                button.disabled = false; // Re-enable on error
                 typewriterEffect(`CHALLENGE ERROR: ${error.message}`, button.parentElement);
             }
         }
@@ -1382,6 +1393,7 @@
             console.log('🎲 Challenge received:', challenge);
             const button = document.getElementById('authButton');
             button.textContent = '[ SIGNING CHALLENGE... ]';
+            button.disabled = true; // Prevent multiple submissions
             
             try {
                 // Use the actual challenge as the nonce (not a timestamp!)
@@ -1420,6 +1432,14 @@
                     if (verifyData.status === 'submit_response_submitted') {
                         button.textContent = '[ WAITING FOR AUTHENTICATION... ]';
                         typewriterEffect('CHALLENGE SIGNED. WAITING FOR BLOCKCHAIN CONFIRMATION...', button.parentElement);
+                    } else if (verifyData.status === 'already_authenticated') {
+                        console.log('🔄 Authentication already completed - no duplicate transaction needed');
+                        handleAuthenticated(currentSessionToken || 'existing_session');
+                    } else if (verifyData.status === 'request_in_progress') {
+                        console.log('🔄 Duplicate request blocked - authentication already in progress');
+                        button.textContent = '[ AUTHENTICATION IN PROGRESS... ]';
+                        button.disabled = false; // Re-enable button for user retry
+                        // Don't throw error, just wait for WebSocket update
                     } else {
                         throw new Error('Failed to submit response: ' + verifyData.status);
                     }
@@ -1443,6 +1463,7 @@
             button.style.background = 'var(--success)';
             button.style.borderColor = 'var(--success)';
             button.style.color = 'var(--bg-black)';
+            button.disabled = true; // Disable button to prevent multiple authentication attempts
             
             // Show logout button
             const logoutBtn = document.getElementById('logoutButton');
@@ -1596,15 +1617,21 @@
                 showCommentForm(false);
                 
                 // Hide authentication panel
-                document.querySelector('.auth-panel').style.display = 'none';
+                document.querySelector('#authPanel').style.display = 'none';
             } else {
-                // Show authentication panel
-                document.querySelector('.auth-panel').style.display = 'block';
-                document.getElementById('commentForm').style.display = 'none';
-                
-                // Reset participant info
-                document.getElementById('walletAddress').textContent = 'kaspa:qrxx...v8wz';
-                document.getElementById('episodeId').textContent = '--';
+                // Show authentication panel only if not already authenticated
+                if (!isAuthenticated) {
+                    document.querySelector('#authPanel').style.display = 'block';
+                    document.getElementById('commentForm').style.display = 'none';
+                    
+                    // Reset participant info
+                    if (currentWallet) {
+                        document.getElementById('walletAddress').textContent = truncateKaspaAddress(currentWallet.kaspaAddress);
+                    } else {
+                        document.getElementById('walletAddress').textContent = 'kaspa:qrxx...v8wz';
+                    }
+                    document.getElementById('episodeId').textContent = currentEpisodeId || '--';
+                }
             }
         }
         
