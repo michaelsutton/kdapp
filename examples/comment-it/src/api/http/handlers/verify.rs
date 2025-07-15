@@ -174,7 +174,7 @@ pub async fn verify_auth(
     ).await {
         Ok(tx_id) => {
             println!("✅ MATRIX UI SUCCESS: Authentication signature submitted - Transaction {}", tx_id);
-            println!("📊 Transactions are now being processed by auth organizer peer's kdapp engine");
+            println!("📊 Transaction submitted to Kaspa blockchain - organizer peer will detect and respond");
             (tx_id, "submit_response_submitted".to_string())
         }
         Err(e) => {

@@ -2,7 +2,7 @@
 use axum::{routing::{get, post}, Router, extract::State};
 use axum::serve;
 use std::sync::Arc;
-use std::collections::HashSet;
+// Remove unused import
 use tokio::sync::broadcast;
 use crate::wallet::get_wallet_for_command;
 use tower_http::cors::{CorsLayer, Any};
@@ -332,6 +332,8 @@ async fn episode_authenticated(
         authenticated: Some(true),
         challenge: Some(challenge.to_string()),
         session_token: real_session_token,
+        comment: None,
+        comments: None,
     };
     
     // Send to all connected WebSocket clients
@@ -360,6 +362,8 @@ async fn session_revoked(
         authenticated: Some(false),
         challenge: None,
         session_token: Some(session_token.to_string()),
+        comment: None,
+        comments: None,
     };
     
     // Send to all connected WebSocket clients

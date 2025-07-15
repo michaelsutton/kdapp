@@ -140,7 +140,7 @@ pub async fn revoke_session(
     ).await {
         Ok(tx_id) => {
             println!("✅ MATRIX UI SUCCESS: Session revocation submitted - Transaction {}", tx_id);
-            println!("📊 Transaction is now being processed by auth organizer peer's kdapp engine");
+            println!("📊 Transaction submitted to Kaspa blockchain - organizer peer will detect and respond");
             (tx_id, "session_revocation_submitted".to_string())
         }
         Err(e) => {

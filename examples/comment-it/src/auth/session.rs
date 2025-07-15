@@ -77,8 +77,10 @@ pub async fn run_session_revocation(auth_signer: Keypair, episode_id: u64, sessi
     let _res = kaspad.submit_transaction(tx.as_ref().into(), false).await?;
     
     println!("✅ Session revocation submitted to Kaspa blockchain!");
+    println!("🔗 [ VERIFY ON KASPA EXPLORER → ] https://explorer-tn10.kaspa.org/txs/{}", tx.id());
+    println!("🔗 [ VIEW WALLET ON EXPLORER → ] https://explorer-tn10.kaspa.org/addresses/{}", kaspa_addr);
     println!("🔄 Session token {} has been revoked", session_token);
-    println!("📊 Transaction is now being processed by auth organizer peer's kdapp engine");
+    println!("📊 Transaction submitted to Kaspa blockchain - organizer peer will detect and respond");
     
     Ok(())
 }

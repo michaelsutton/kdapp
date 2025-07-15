@@ -217,6 +217,8 @@ impl EpisodeEventHandler<SimpleAuth> for HttpAuthHandler {
             authenticated: Some(false),
             challenge: episode.challenge.clone(),
             session_token: episode.session_token.clone(),
+            comment: None,
+            comments: None,
         };
         
         let _ = self.websocket_tx.send(message);
@@ -257,6 +259,8 @@ impl EpisodeEventHandler<SimpleAuth> for HttpAuthHandler {
                 authenticated: Some(true),
                 challenge: episode.challenge.clone(),
                 session_token: episode.session_token.clone(),
+                comment: None,
+                comments: None,
             };
             let _ = self.websocket_tx.send(message);
         } else if !episode.is_authenticated && episode.session_token.is_none() && episode.challenge.is_some() {
@@ -271,6 +275,8 @@ impl EpisodeEventHandler<SimpleAuth> for HttpAuthHandler {
                         authenticated: Some(false),
                         challenge: episode.challenge.clone(),
                         session_token: None,
+                        comment: None,
+                        comments: None,
                     };
                     let receiver_count = self.websocket_tx.receiver_count();
                     let _ = self.websocket_tx.send(message);
@@ -287,6 +293,8 @@ impl EpisodeEventHandler<SimpleAuth> for HttpAuthHandler {
                 authenticated: Some(false),
                 challenge: episode.challenge.clone(),
                 session_token: None,
+                comment: None,
+                comments: None,
             };
             let _ = self.websocket_tx.send(message);
         }

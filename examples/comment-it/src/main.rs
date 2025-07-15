@@ -27,6 +27,12 @@ use kdapp::generator;
 // use crate::cli::Cli; // Using inline clap structure instead
 // use clap::Parser;
 
+// Helper function to generate Kaspa explorer links
+fn print_explorer_links(tx_id: &str, wallet_address: &str) {
+    println!("🔗 [ VERIFY ON KASPA EXPLORER → ] https://explorer-tn10.kaspa.org/txs/{}", tx_id);
+    println!("🔗 [ VIEW WALLET ON EXPLORER → ] https://explorer-tn10.kaspa.org/addresses/{}", wallet_address);
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // Initialize tracing for better logging
@@ -222,6 +228,41 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         .value_name("PEER_ADDRESS")
                         .help("HTTP organizer peer address")
                         .default_value("http://localhost:8080")
+                )
+        )
+        .subcommand(
+            Command::new("submit-comment")
+                .about("💬 Submit a comment to an episode via blockchain")
+                .arg(
+                    Arg::new("episode-id")
+                        .short('e')
+                        .long("episode-id")
+                        .value_name("EPISODE_ID")
+                        .help("Episode ID to comment on")
+                        .required(true)
+                )
+                .arg(
+                    Arg::new("text")
+                        .short('t')
+                        .long("text")
+                        .value_name("TEXT")
+                        .help("Comment text (max 2000 characters)")
+                        .required(true)
+                )
+                .arg(
+                    Arg::new("session-token")
+                        .short('s')
+                        .long("session-token")
+                        .value_name("SESSION_TOKEN")
+                        .help("Authentication session token")
+                        .required(true)
+                )
+                .arg(
+                    Arg::new("key")
+                        .short('k')
+                        .long("key")
+                        .value_name("PRIVATE_KEY")
+                        .help("Private key (hex format) - uses participant wallet if not provided")
                 )
         )
         .subcommand(
@@ -491,6 +532,33 @@ async fn main() -> Result<(), Box<dyn Error>> {
             
             println!("🔄 Running session revocation (blockchain transaction)");
             run_session_revocation(auth_keypair, episode_id, session_token, peer_url).await?;
+        }
+        Some(("submit-comment", sub_matches)) => {
+            let episode_id: u64 = sub_matches
+                .get_one::<String>("episode-id")
+                .unwrap()
+                .parse()
+                .map_err(|_| "Invalid episode ID")?;
+            
+            let comment_text = sub_matches
+                .get_one::<String>("text")
+                .unwrap()
+                .clone();
+            
+            let session_token = sub_matches
+                .get_one::<String>("session-token")
+                .unwrap()
+                .clone();
+            
+            let private_key = sub_matches.get_one::<String>("key").map(|s| s.as_str());
+            
+            comment_it::cli::commands::submit_comment::run_submit_comment_command(
+                episode_id,
+                comment_text,
+                session_token,
+                None, // kaspa_address
+                private_key,
+            ).await?;
         }
         Some(("wallet-status", sub_matches)) => {
             let role = sub_matches.get_one::<String>("role").unwrap();
@@ -1083,6 +1151,7 @@ pub async fn run_http_coordinated_authentication(kaspa_signer: Keypair, auth_sig
     utxo = generator::get_first_output_utxo(&tx);
     
     println!("✅ Episode {} initialized on blockchain!", episode_id);
+    print_explorer_links(&tx.id().to_string(), &kaspa_addr.to_string());
     
     // Step 2: Send RequestChallenge command to blockchain
     println!("📨 Sending RequestChallenge command to blockchain...");
@@ -1102,6 +1171,7 @@ pub async fn run_http_coordinated_authentication(kaspa_signer: Keypair, auth_sig
     utxo = generator::get_first_output_utxo(&tx);
     
     println!("✅ RequestChallenge transaction submitted to blockchain!");
+    print_explorer_links(&tx.id().to_string(), &kaspa_addr.to_string());
     println!("⏳ Waiting for challenge response from auth server...");
     
     // Set up episode state listener (like tictactoe example)
@@ -1221,7 +1291,8 @@ pub async fn run_http_coordinated_authentication(kaspa_signer: Keypair, auth_sig
     
     println!("✅ Authentication commands submitted to Kaspa blockchain!");
     println!("🎯 Real kdapp architecture: Generator → Proxy → Engine → Episode");
-    println!("📊 Transactions are now being processed by auth server's kdapp engine");
+    print_explorer_links(&tx.id().to_string(), &kaspa_addr.to_string());
+    println!("📊 Transactions submitted to Kaspa blockchain - organizer peer will detect and respond");
     
     // Wait for authentication to complete and get the real session token from blockchain
     println!("⏳ Waiting for authentication completion to retrieve session token...");
@@ -1333,7 +1404,8 @@ pub async fn run_session_revocation(auth_signer: Keypair, episode_id: u64, sessi
     
     println!("✅ Session revocation submitted to Kaspa blockchain!");
     println!("🔄 Session token {} has been revoked", session_token);
-    println!("📊 Transaction is now being processed by auth organizer peer's kdapp engine");
+    print_explorer_links(&tx.id().to_string(), &kaspa_addr.to_string());
+    println!("📊 Transaction submitted to Kaspa blockchain - organizer peer will detect and respond");
     
     Ok(())
 }

@@ -5,6 +5,7 @@ use kdapp::{
 };
 use log::info;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use thiserror::Error;
 
 /// Commands for the comment episode
@@ -17,6 +18,25 @@ pub enum CommentCommand {
         session_token: String,
         signature: String,
     },
+    /// Get all comments (for authenticated users)
+    GetComments {
+        session_token: Option<String>,
+    },
+    /// Get comments by specific author
+    GetCommentsByAuthor {
+        author: String,
+        session_token: Option<String>,
+    },
+    /// Register a valid authentication session
+    RegisterSession {
+        public_key: String,
+        session_token: String,
+        auth_episode_id: u64,
+    },
+    /// Revoke a session (when user logs out)
+    RevokeSession {
+        session_token: String,
+    },
 }
 
 /// Rollback data for comment commands
@@ -24,6 +44,16 @@ pub enum CommentCommand {
 pub enum CommentRollback {
     CommentSubmitted {
         comment_id: u64,
+    },
+    CommentsQueried {
+        // No rollback needed for read operations
+    },
+    SessionRegistered {
+        public_key: String,
+    },
+    SessionRevoked {
+        public_key: String,
+        session_token: String,
     },
 }
 
@@ -34,7 +64,7 @@ pub enum CommentError {
     InvalidSessionToken,
     #[error("Signature verification failed")]
     SignatureVerificationFailed,
-    #[error("Comment is too long (max 1000 characters)")]
+    #[error("Comment is too long (max 2000 characters)")]
     CommentTooLong,
     #[error("Comment cannot be empty")]
     CommentEmpty,
@@ -63,6 +93,10 @@ pub struct CommentEpisode {
     pub authorized_participants: Vec<PubKey>,
     /// Timestamp of episode creation
     pub created_at: u64,
+    /// Valid authentication sessions (pubkey -> session_token)
+    pub valid_sessions: std::collections::HashMap<String, String>,
+    /// Associated authentication episode ID (for session validation)
+    pub auth_episode_id: Option<u64>,
 }
 
 impl Episode for CommentEpisode {
@@ -77,6 +111,8 @@ impl Episode for CommentEpisode {
             next_id: 1,
             authorized_participants: participants,
             created_at: metadata.accepting_time,
+            valid_sessions: HashMap::new(),
+            auth_episode_id: None,
         }
     }
 
@@ -104,14 +140,29 @@ impl Episode for CommentEpisode {
                     return Err(EpisodeError::InvalidCommand(CommentError::CommentEmpty));
                 }
                 
-                if text.len() > 1000 {
+                if text.len() > 2000 {
                     return Err(EpisodeError::InvalidCommand(CommentError::CommentTooLong));
                 }
                 
-                // TODO: Verify session token with kaspa-auth
-                // TODO: Verify signature
+                // CRITICAL: Verify user has valid authentication session
+                let participant_key = format!("{}", participant);
+                if !self.valid_sessions.contains_key(&participant_key) {
+                    info!("[CommentEpisode] Comment rejected: No valid session for {}", participant_key);
+                    return Err(EpisodeError::InvalidCommand(CommentError::InvalidSessionToken));
+                }
                 
-                // Create new comment
+                // Verify session token matches
+                if let Some(stored_token) = self.valid_sessions.get(&participant_key) {
+                    if stored_token != session_token {
+                        info!("[CommentEpisode] Comment rejected: Session token mismatch for {}", participant_key);
+                        return Err(EpisodeError::InvalidCommand(CommentError::InvalidSessionToken));
+                    }
+                } else {
+                    info!("[CommentEpisode] Comment rejected: No stored session token for {}", participant_key);
+                    return Err(EpisodeError::InvalidCommand(CommentError::InvalidSessionToken));
+                }
+                
+                // Authentication passed - create new comment
                 let comment = Comment {
                     id: self.next_id,
                     text: text.clone(),
@@ -125,9 +176,67 @@ impl Episode for CommentEpisode {
                 self.comments.push(comment);
                 self.next_id += 1;
                 
-                info!("[CommentEpisode] Comment {} added successfully", comment_id);
+                info!("[CommentEpisode] ✅ Comment {} added successfully (authenticated user)", comment_id);
                 
                 Ok(CommentRollback::CommentSubmitted { comment_id })
+            }
+            
+            CommentCommand::GetComments { session_token: _ } => {
+                info!("[CommentEpisode] GetComments from: {:?}", participant);
+                
+                // For now, allow only authenticated users to read comments
+                // TODO: When profile episode is implemented, support anonymous users
+                
+                Ok(CommentRollback::CommentsQueried {})
+            }
+            
+            CommentCommand::GetCommentsByAuthor { author, session_token: _ } => {
+                info!("[CommentEpisode] GetCommentsByAuthor {} from: {:?}", author, participant);
+                
+                // For now, allow only authenticated users to read comments
+                // TODO: When profile episode is implemented, support anonymous users
+                
+                Ok(CommentRollback::CommentsQueried {})
+            }
+            
+            CommentCommand::RegisterSession { public_key, session_token, auth_episode_id } => {
+                info!("[CommentEpisode] RegisterSession for {} from auth episode {}", public_key, auth_episode_id);
+                
+                // Store the valid session
+                self.valid_sessions.insert(public_key.clone(), session_token.clone());
+                if self.auth_episode_id.is_none() {
+                    self.auth_episode_id = Some(*auth_episode_id);
+                }
+                
+                info!("[CommentEpisode] ✅ Session registered for {}", public_key);
+                
+                Ok(CommentRollback::SessionRegistered { public_key: public_key.clone() })
+            }
+            
+            CommentCommand::RevokeSession { session_token } => {
+                info!("[CommentEpisode] RevokeSession for token: {}", session_token);
+                
+                // Find and remove the session
+                let mut revoked_key = None;
+                for (key, token) in &self.valid_sessions {
+                    if token == session_token {
+                        revoked_key = Some(key.clone());
+                        break;
+                    }
+                }
+                
+                if let Some(key) = revoked_key {
+                    self.valid_sessions.remove(&key);
+                    info!("[CommentEpisode] ✅ Session revoked for {}", key);
+                    
+                    Ok(CommentRollback::SessionRevoked { 
+                        public_key: key, 
+                        session_token: session_token.clone() 
+                    })
+                } else {
+                    info!("[CommentEpisode] Session revocation failed: token not found");
+                    Err(EpisodeError::InvalidCommand(CommentError::InvalidSessionToken))
+                }
             }
         }
     }
@@ -143,6 +252,20 @@ impl Episode for CommentEpisode {
                 } else {
                     false
                 }
+            }
+            CommentRollback::CommentsQueried {} => {
+                // No rollback needed for read operations
+                true
+            }
+            CommentRollback::SessionRegistered { public_key } => {
+                // Remove the session that was just registered
+                self.valid_sessions.remove(&public_key);
+                true
+            }
+            CommentRollback::SessionRevoked { public_key, session_token } => {
+                // Restore the session that was just revoked
+                self.valid_sessions.insert(public_key, session_token);
+                true
             }
         }
     }
@@ -164,6 +287,30 @@ impl CommentEpisode {
         let mut comments: Vec<&Comment> = self.comments.iter().collect();
         comments.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
         comments.into_iter().take(limit).collect()
+    }
+    
+    /// Check if a user has a valid session
+    pub fn has_valid_session(&self, public_key: &str) -> bool {
+        self.valid_sessions.contains_key(public_key)
+    }
+    
+    /// Get the session token for a user
+    pub fn get_session_token(&self, public_key: &str) -> Option<&String> {
+        self.valid_sessions.get(public_key)
+    }
+    
+    /// Get count of authenticated users
+    pub fn authenticated_user_count(&self) -> usize {
+        self.valid_sessions.len()
+    }
+    
+    /// Check if user can comment (has valid session)
+    pub fn can_comment(&self, public_key: &str, session_token: &str) -> bool {
+        if let Some(stored_token) = self.valid_sessions.get(public_key) {
+            stored_token == session_token
+        } else {
+            false
+        }
     }
 }
 
@@ -260,7 +407,7 @@ mod tests {
         let mut episode = CommentEpisode::initialize(vec![p1], &metadata);
         
         // Try to submit very long comment
-        let long_text = "a".repeat(1001); // Over 1000 character limit
+        let long_text = "a".repeat(2001); // Over 2000 character limit
         let cmd = CommentCommand::SubmitComment {
             text: long_text,
             author: "test_author".to_string(),

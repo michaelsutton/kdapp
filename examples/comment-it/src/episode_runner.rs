@@ -9,6 +9,7 @@ use reqwest::Client;
 use serde_json::json;
 
 use crate::{core::episode::SimpleAuth, core::commands::AuthCommand};
+use crate::comment::{CommentEpisode, CommentCommand};
 
 // Define unique pattern and prefix for auth transactions
 // Pattern: specific byte positions that must match to reduce node overhead
@@ -19,6 +20,16 @@ pub const AUTH_PATTERN: PatternType = [
 
 // Unique prefix to identify auth transactions (chosen to avoid conflicts)
 pub const AUTH_PREFIX: PrefixType = 0x41555448; // "AUTH" in hex
+
+// Define unique pattern and prefix for comment transactions
+// Pattern: different byte positions to avoid conflicts with AUTH_PATTERN
+pub const COMMENT_PATTERN: PatternType = [
+    (5, 1), (28, 0), (47, 1), (89, 0), (115, 1), 
+    (128, 0), (191, 1), (205, 0), (218, 1), (248, 0)
+];
+
+// Unique prefix to identify comment transactions
+pub const COMMENT_PREFIX: PrefixType = 0x434F4D4D; // "COMM" in hex
 
 /// Event handler for authentication episodes
 pub struct AuthEventHandler {
@@ -131,6 +142,165 @@ impl EpisodeEventHandler<SimpleAuth> for AuthEventHandler {
 
     fn on_rollback(&self, episode_id: EpisodeId, _episode: &SimpleAuth) {
         warn!("[{}] Episode {} rolled back due to DAG reorg", self.name, episode_id);
+    }
+}
+
+/// Event handler for comment episodes
+pub struct CommentEventHandler {
+    pub name: String,
+}
+
+impl CommentEventHandler {
+    pub fn new(name: String) -> Self {
+        Self { name }
+    }
+}
+
+impl EpisodeEventHandler<CommentEpisode> for CommentEventHandler {
+    fn on_initialize(&self, episode_id: EpisodeId, episode: &CommentEpisode) {
+        info!("[{}] Comment Episode {} initialized with {} authorized participants", 
+              self.name, episode_id, episode.authorized_participants.len());
+    }
+
+    fn on_command(&self, episode_id: EpisodeId, episode: &CommentEpisode, 
+                  cmd: &CommentCommand, authorization: Option<PubKey>, 
+                  _metadata: &PayloadMetadata) {
+        match cmd {
+            CommentCommand::SubmitComment { text, author, session_token: _, signature: _ } => {
+                info!("[{}] Comment Episode {}: New comment submitted by {}", 
+                      self.name, episode_id, author);
+                info!("[{}] Comment Episode {}: Comment: \"{}\"", 
+                      self.name, episode_id, text);
+                
+                // Find the new comment that was just added
+                if let Some(new_comment) = episode.comments.last() {
+                    info!("[{}] Comment Episode {}: ✅ Comment {} added successfully!", 
+                          self.name, episode_id, new_comment.id);
+                    
+                    // Notify HTTP server about new comment
+                    let client = Client::new();
+                    let episode_id_clone = episode_id;
+                    let comment_text = text.clone();
+                    let comment_author = author.clone();
+                    let comment_id = new_comment.id;
+                    let comment_timestamp = new_comment.timestamp;
+                    
+                    tokio::spawn(async move {
+                        let url = "http://127.0.0.1:8080/internal/comment-added";
+                        let res = client.post(url)
+                            .json(&json!({
+                                "episode_id": episode_id_clone,
+                                "comment_id": comment_id,
+                                "text": comment_text,
+                                "author": comment_author,
+                                "timestamp": comment_timestamp,
+                            }))
+                            .send()
+                            .await;
+                        
+                        match res {
+                            Ok(response) if response.status().is_success() => {
+                                info!("✅ Successfully notified HTTP server of new comment for episode {}", episode_id_clone);
+                            },
+                            Ok(response) => {
+                                error!("❌ Failed to notify HTTP server of new comment for episode {}: Status {}", episode_id_clone, response.status());
+                            },
+                            Err(e) => {
+                                error!("❌ Failed to notify HTTP server of new comment for episode {}: Error {}", episode_id_clone, e);
+                            }
+                        }
+                    });
+                } else {
+                    warn!("[{}] Comment Episode {}: ❌ Comment submission failed", 
+                          self.name, episode_id);
+                }
+            }
+            
+            CommentCommand::GetComments { session_token: _ } => {
+                info!("[{}] Comment Episode {}: Comments requested by {:?}", 
+                      self.name, episode_id, authorization);
+                info!("[{}] Comment Episode {}: Returning {} comments", 
+                      self.name, episode_id, episode.comments.len());
+            }
+            
+            CommentCommand::GetCommentsByAuthor { author, session_token: _ } => {
+                let author_comments = episode.get_comments_by_author(author);
+                info!("[{}] Comment Episode {}: Comments by {} requested, found {} comments", 
+                      self.name, episode_id, author, author_comments.len());
+            }
+            
+            CommentCommand::RegisterSession { public_key, session_token, auth_episode_id } => {
+                info!("[{}] Comment Episode {}: Session registered for {} from auth episode {}", 
+                      self.name, episode_id, public_key, auth_episode_id);
+                
+                // Notify HTTP server about session registration
+                let client = Client::new();
+                let episode_id_clone = episode_id;
+                let public_key_clone = public_key.clone();
+                let session_token_clone = session_token.clone();
+                
+                tokio::spawn(async move {
+                    let url = "http://127.0.0.1:8080/internal/session-registered";
+                    let res = client.post(url)
+                        .json(&json!({
+                            "comment_episode_id": episode_id_clone,
+                            "public_key": public_key_clone,
+                            "session_token": session_token_clone,
+                        }))
+                        .send()
+                        .await;
+                    
+                    match res {
+                        Ok(response) if response.status().is_success() => {
+                            info!("✅ Successfully notified HTTP server of session registration for comment episode {}", episode_id_clone);
+                        },
+                        Ok(response) => {
+                            error!("❌ Failed to notify HTTP server of session registration: Status {}", response.status());
+                        },
+                        Err(e) => {
+                            error!("❌ Failed to notify HTTP server of session registration: Error {}", e);
+                        }
+                    }
+                });
+            }
+            
+            CommentCommand::RevokeSession { session_token } => {
+                info!("[{}] Comment Episode {}: Session revoked for token: {}", 
+                      self.name, episode_id, session_token);
+                
+                // Notify HTTP server about session revocation
+                let client = Client::new();
+                let episode_id_clone = episode_id;
+                let session_token_clone = session_token.clone();
+                
+                tokio::spawn(async move {
+                    let url = "http://127.0.0.1:8080/internal/comment-session-revoked";
+                    let res = client.post(url)
+                        .json(&json!({
+                            "comment_episode_id": episode_id_clone,
+                            "session_token": session_token_clone,
+                        }))
+                        .send()
+                        .await;
+                    
+                    match res {
+                        Ok(response) if response.status().is_success() => {
+                            info!("✅ Successfully notified HTTP server of comment session revocation for episode {}", episode_id_clone);
+                        },
+                        Ok(response) => {
+                            error!("❌ Failed to notify HTTP server of comment session revocation: Status {}", response.status());
+                        },
+                        Err(e) => {
+                            error!("❌ Failed to notify HTTP server of comment session revocation: Error {}", e);
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    fn on_rollback(&self, episode_id: EpisodeId, _episode: &CommentEpisode) {
+        warn!("[{}] Comment Episode {} rolled back due to DAG reorg", self.name, episode_id);
     }
 }
 

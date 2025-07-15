@@ -38,4 +38,7 @@ pub struct WebSocketMessage {
     pub authenticated: Option<bool>,
     pub challenge: Option<String>,
     pub session_token: Option<String>,
+    // Comment-related fields
+    pub comment: Option<crate::api::http::types::CommentData>,
+    pub comments: Option<Vec<crate::api::http::types::CommentData>>,
 }

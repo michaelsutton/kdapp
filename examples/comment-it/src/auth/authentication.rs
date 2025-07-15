@@ -98,6 +98,8 @@ pub async fn run_http_coordinated_authentication(kaspa_signer: Keypair, auth_sig
     utxo = generator::get_first_output_utxo(&tx);
     
     println!("✅ RequestChallenge transaction submitted to blockchain!");
+    println!("🔗 [ VERIFY ON KASPA EXPLORER → ] https://explorer-tn10.kaspa.org/txs/{}", tx.id());
+    println!("🔗 [ VIEW WALLET ON EXPLORER → ] https://explorer-tn10.kaspa.org/addresses/{}", kaspa_addr);
     println!("⏳ Waiting for challenge response from auth server...");
     
     // Wait for server to process RequestChallenge and generate challenge
@@ -167,16 +169,17 @@ pub async fn run_http_coordinated_authentication(kaspa_signer: Keypair, auth_sig
     let _res = kaspad.submit_transaction(tx.as_ref().into(), false).await?;
     
     println!("✅ Authentication commands submitted to Kaspa blockchain!");
+    println!("🔗 [ VERIFY ON KASPA EXPLORER → ] https://explorer-tn10.kaspa.org/txs/{}", tx.id());
+    println!("🔗 [ VIEW WALLET ON EXPLORER → ] https://explorer-tn10.kaspa.org/addresses/{}", kaspa_addr);
     println!("🎯 Real kdapp architecture: Generator → Proxy → Engine → Episode");
-    println!("📊 Transactions are now being processed by auth server's kdapp engine");
+    println!("📊 Transactions submitted to Kaspa blockchain - organizer peer will detect and respond");
     
     // Wait for authentication to complete and get the real session token via HTTP
     println!("⏳ Waiting for authentication completion to retrieve session token...");
-    let mut session_token = String::new();
     let mut wait_attempts = 0;
     let max_wait_attempts = 50; // 5 second timeout
     
-    'auth_wait: loop {
+    let session_token = loop {
         wait_attempts += 1;
         
         // Check authentication status via HTTP (server has the real blockchain state)
@@ -189,9 +192,9 @@ pub async fn run_http_coordinated_authentication(kaspa_signer: Keypair, auth_sig
                         parsed["session_token"].as_str()
                     ) {
                         if authenticated && !token.is_empty() {
-                            session_token = token.to_string();
+                            let session_token = token.to_string();
                             println!("✅ Real session token retrieved from server: {}", session_token);
-                            break 'auth_wait;
+                            break session_token;
                         }
                     }
                 }
@@ -199,10 +202,15 @@ pub async fn run_http_coordinated_authentication(kaspa_signer: Keypair, auth_sig
         }
         
         if wait_attempts >= max_wait_attempts {
-            return Err("❌ AUTHENTICATION FAILED: Could not retrieve session token from server. Authentication incomplete.".into());
+            break "".to_string(); // Return empty string, handle error after loop
         }
         
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    };
+    
+    // Check if authentication timed out
+    if session_token.is_empty() {
+        return Err("❌ AUTHENTICATION FAILED: Could not retrieve session token from server. Authentication incomplete.".into());
     }
     
     Ok(AuthenticationResult {
