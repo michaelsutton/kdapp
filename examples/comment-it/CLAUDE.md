@@ -26,23 +26,38 @@
 
 ---
 
-## 🚀 **CURRENT PRIORITY: Web MVP Commenting System**
+## 🚀 **NEXT SESSION ROADMAP - UPDATED WITH PROGRESS**
 
-### **Phase 1: Fix Current State Issues (30 mins)**
-- ✅ Fix any remaining WebSocket sync issues
-- ✅ Ensure logout button shows correctly  
-- ✅ Test wallet creation/import flows
+### **✅ COMPLETED THIS SESSION:**
+- ✅ **KDAPP FRAMEWORK BUG FIX**: Fixed critical proxy.rs WebSocket crash (READY FOR PR!)
+- ✅ **Authentication Flow**: Working login/logout cycle with blockchain integration
+- ✅ **UI State Management**: Temporary browser restart solution for clean state
+- ✅ **Address Truncation**: Better UI display for long Kaspa addresses
+- ✅ **WebSocket Stability**: No more backend crashes on network interruptions
 
-### **Phase 2: Implement Commenting (2-3 hours)**
-- 🎯 Add comment episode creation
-- 🎯 Display comments from blockchain
-- 🎯 Matrix-themed comment UI
-- 🎯 Anonymous vs authenticated commenting
+### **🎯 NEXT SESSION PRIORITIES:**
 
-### **Phase 3: Polish MVP (1 hour)**
-- 🎯 Real-time comment updates via WebSocket
-- 🎯 Basic comment threading
-- 🎯 Mobile-responsive Matrix UI
+### **Phase 1: Submit kdapp Framework PR (30 mins)**
+- 🚀 **SUBMIT PR**: proxy.rs WebSocket crash fix to michaelsutton/kdapp
+- 🚀 **Community Engagement**: Twitter/X announcement of framework contribution
+- 🚀 **Funding Campaign**: "Even 1 KAS can change the world" post-PR campaign
+
+### **Phase 2: Complete Comment System MVP (2-3 hours)**
+- 🎯 **Comment Episode Creation**: New episode type for comments
+- 🎯 **Blockchain Comment Display**: Read comments from Kaspa transactions
+- 🎯 **Matrix UI Integration**: Comment cards with cyberpunk styling
+- 🎯 **Anonymous vs Authenticated**: Different features for each mode
+
+### **Phase 3: State Management Decision (1 hour)**
+- 🎯 **Evaluate Options**: Zustand, Dioxus RSX, or custom Kaspa state library
+- 🎯 **Remove Browser Restart**: Replace with proper state management
+- 🎯 **Performance Testing**: Ensure smooth real-time updates
+
+### **🏆 SUCCESS METRICS:**
+- [ ] kdapp framework PR submitted and acknowledged
+- [ ] Community funding campaign launched
+- [ ] Working comment system with blockchain persistence
+- [ ] Clean state management without browser restarts
 
 ## 🤖 **AUTO-COMMIT PROTOCOL**
 Claude will automatically commit progress:
