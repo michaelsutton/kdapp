@@ -1,0 +1,48 @@
+# Build artifacts
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Development folders (exclude from git)
+day_6/
+day_*/
+opus_4/
+
+# Future development modules (not part of kaspa-auth example)
+episode-contract/
+kaspa-poker-tournament/
+
+# Temporary files
+*.tmp
+*.temp
+*.sh
+server.log
+backup_log.txt
+server_debug.log
+server_direct.log
+fix_404_issue.sh
+quick_debug.sh
+test_*.sh
+
+# Logs
+*.log
+
+# 🔐 SECURITY: Private Keys and Wallet Files (NEVER COMMIT THESE!)
+.kaspa-auth/
+*.key
+*.pem
+wallet.dat
+*-wallet.key
+private_key.txt
+my-key.txt
+kaspa_private.key
+participant-peer-wallet.key
+organizer-peer-wallet.key
+**/private_key*
+**/wallet*

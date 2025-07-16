@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaspa Auth - Web Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #232526 0%, #414345 100%);
+            min-height: 100vh;
+            color: #f3f3f3;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #23272f;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            padding: 40px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            color: #fff;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 8px #0008;
+        }
+        
+        .header p {
+            color: #b0b0b0;
+            font-size: 1.1em;
+        }
+        
+        .logo-image {
+            width: 180px;
+            max-width: 100%;
+            display: block;
+            margin: 0 auto 20px auto;
+            border-radius: 50%;
+            box-shadow: 0 0 40px 0 #fff8, 0 0 20px 0 #70c7ba44;
+            background: #fff;
+            border: 4px solid #fff;
+        }
+        
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: #23272f;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            border-left: 4px solid #70c7ba;
+            color: #fff;
+        }
+        
+        .connection-status {
+            font-weight: bold;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+        
+        .connected {
+            background: #2ecc40;
+            color: #fff;
+        }
+        
+        .disconnected {
+            background: #e53e3e;
+            color: #fff;
+        }
+        
+        .auth-section {
+            background: #23272f;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            position: relative;
+            box-shadow: 0 2px 12px #0004;
+        }
+        
+        .auth-button {
+            background: linear-gradient(135deg, #70c7ba 0%, #5db3a8 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            font-weight: bold;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            max-width: 300px;
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 2px 8px #0004;
+        }
+        
+        .auth-button:hover:not(:disabled) {
+            transform: translateY(-2px) scale(1.03);
+            box-shadow: 0 8px 25px #70c7ba55;
+        }
+        
+        .auth-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        /* Redesigned reset button */
+        .reset-btn {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            background: #e53e3e;
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 38px;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3em;
+            cursor: pointer;
+            box-shadow: 0 2px 8px #0006;
+            transition: background 0.2s, transform 0.2s;
+            z-index: 2;
+        }
+        .reset-btn:hover {
+            background: #ff5555;
+            transform: scale(1.08);
+        }
+        .reset-btn:focus {
+            outline: 2px solid #fff;
+        }
+        .reset-btn[title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            top: 45px;
+            right: 0;
+            background: #23272f;
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            white-space: nowrap;
+            box-shadow: 0 2px 8px #0008;
+        }
+        
+        .progress-indicator {
+            display: none;
+            margin-top: 30px;
+        }
+        
+        .progress-step {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .progress-step.pending {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+        
+        .progress-step.active {
+            background: #dbeafe;
+            color: #1e40af;
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .progress-step.complete {
+            background: #dcfce7;
+            color: #166534;
+            border-left: 4px solid #22c55e;
+        }
+        
+        .step-number {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            font-size: 0.9em;
+        }
+        
+        .pending .step-number {
+            background: #e2e8f0;
+            color: #64748b;
+        }
+        
+        .active .step-number {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .complete .step-number {
+            background: #22c55e;
+            color: white;
+        }
+        
+        .success-card {
+            display: none;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            margin-top: 30px;
+        }
+        
+        .success-card h3 {
+            margin-top: 0;
+            font-size: 1.5em;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        
+        .info-card {
+            background: #23272f;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #333a;
+            color: #f3f3f3;
+        }
+        
+        .info-card h3 {
+            margin-top: 0;
+            color: #fff;
+            border-bottom: 2px solid #333a;
+            padding-bottom: 10px;
+        }
+        
+        .endpoint-list {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+        
+        .endpoint-item {
+            margin: 5px 0;
+            padding: 5px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .method {
+            font-weight: bold;
+            color: #e53e3e;
+            margin-right: 10px;
+        }
+        
+        .method.get {
+            color: #38a169;
+        }
+        
+        .method.post {
+            color: #3182ce;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="/assets/kdapp_framework.jpg" alt="White Rabbit Motif" class="logo-image" />
+            <h1>Kaspa Auth Dashboard</h1>
+            <p>Secure blockchain-based authentication with real-time updates</p>
+        </div>
+        
+        <div class="status-bar">
+            <div>
+                <strong>🌐 WebSocket Status:</strong>
+                <span id="wsStatus" class="connection-status disconnected">❌ Connecting...</span>
+            </div>
+            <div>
+                <strong>⚡ Server:</strong> localhost:8080
+            </div>
+        </div>
+        
+        <div id="fundingInfo" class="info-card" style="margin-bottom: 30px; display: none;">
+            <h3>💰 Address Information</h3>
+            <div style="font-family: 'Courier New', monospace; font-size: 0.9em; line-height: 1.8;">
+                <div><strong>🖥️ Organizer Peer Address (Coordination Only):</strong> <span id="serverAddress">Loading...</span></div>
+                <div style="font-size: 0.8em; color: #666; margin-left: 20px;">Pre-funded for coordination - you don't need to fund this</div>
+                <div style="margin-top: 10px;"><strong>💰 Your Participant Address (YOU FUND THIS):</strong> <span id="clientAuthAddress">Will be shown after clicking authenticate</span></div>
+                <div style="font-size: 0.8em; color: #22c55e; margin-left: 20px; font-weight: bold;">⚠️ This is the address YOU need to fund for authentication transactions!</div>
+                <div style="margin-top: 10px;"><strong>🌐 Network:</strong> <span id="networkInfo">testnet-10</span></div>
+                <div><strong>🏷️ Transaction Prefix:</strong> <span id="txPrefix">0x41555448 (AUTH)</span></div>
+                <div style="margin-top: 15px;">
+                    <strong>🔍 Explorer Links:</strong><br>
+                    <a href="#" id="explorerLink" target="_blank" style="color: #70c7ba; text-decoration: none;">
+                        🔗 View Organizer Address (Coordination Only)
+                    </a><br>
+                    <a href="#" id="participantExplorerLink" target="_blank" style="color: #f59e0b; text-decoration: none; font-weight: bold;">
+                        💰 View YOUR Participant Address (Payment Confirmation)
+                    </a><br>
+                    <a href="https://faucet.kaspanet.io/" target="_blank" style="color: #70c7ba; text-decoration: none;">
+                        🚰 Get Testnet Funds
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="auth-section">
+            <button class="reset-btn" onclick="resetEpisodes()" title="Reset Episodes">
+                🗑️
+            </button>
+            <h2>🚀 Quick Authentication Test</h2>
+            <p>Test the complete authentication flow with auto-generated keypair</p>
+            <div style="background: #dcfce7; border: 1px solid #86efac; border-radius: 5px; padding: 10px; margin: 10px 0; font-size: 0.9em; color: #111;">
+                <strong>🔐 Real Blockchain Authentication:</strong> This Web UI generates real secp256k1 keypairs, 
+                signs challenges with actual cryptography, and submits verification to Kaspa blockchain.
+                <br><strong>⚡ Live Experience:</strong> Watch real-time blockchain confirmation via WebSocket!
+            </div>
+            <div style="background: #dcfce7; border: 1px solid #86efac; border-radius: 5px; padding: 10px; margin: 10px 0; font-size: 0.9em; color: #111;">
+                <strong>🎯 True Peer-to-Peer Architecture:</strong> Each participant funds their own authentication transactions.
+                <br><strong>💰 You need to fund YOUR participant address</strong> (shown in console) to authenticate.
+                <br><strong>🖥️ Organizer address above</strong> is only for coordination - you don't need to fund it.
+            </div>
+            <button id="authButton" class="auth-button" onclick="handleAuthButton()">
+                🔑 Start Authentication Flow
+            </button>
+            
+            <div id="progressIndicator" class="progress-indicator">
+                <div id="step1" class="progress-step pending">
+                    <div class="step-number">1</div>
+                    <div>Generate cryptographic keypair</div>
+                </div>
+                <div id="step2" class="progress-step pending">
+                    <div class="step-number">2</div>
+                    <div>Create authentication episode</div>
+                </div>
+                <div id="step3" class="progress-step pending">
+                    <div class="step-number">3</div>
+                    <div>Request challenge from blockchain</div>
+                </div>
+                <div id="step4" class="progress-step pending">
+                    <div class="step-number">4</div>
+                    <div>Receive challenge (real-time via WebSocket)</div>
+                </div>
+                <div id="step5" class="progress-step pending">
+                    <div class="step-number">5</div>
+                    <div>Sign challenge locally</div>
+                </div>
+                <div id="step6" class="progress-step pending">
+                    <div class="step-number">6</div>
+                    <div>Submit verification & receive session token</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="success-card" id="successCard">
+            <h3>🎉 Authentication Successful!</h3>
+            <p id="sessionInfo">Session token: <strong id="sessionToken"></strong></p>
+            <p id="episodeInfo">Episode ID: <strong id="episodeId"></strong></p>
+            <p id="clientAddressInfo">Client Address: <strong id="clientKaspaAddress"></strong></p>
+            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.3);">
+                <p><strong>🔍 Find Your Authentication:</strong></p>
+                <p style="font-size: 0.9em;">
+                    Search for episode ID <span id="searchEpisodeId"></span> on 
+                    <a href="#" id="successExplorerLink" target="_blank" style="color: white; text-decoration: underline;">
+                        YOUR Participant Address Explorer
+                    </a>
+                </p>
+                <p style="font-size: 0.8em; opacity: 0.8;">
+                    Look for transactions with AUTH prefix (0x41555448) containing your episode ID on YOUR funded address
+                </p>
+            </div>
+        </div>
+        
+        <div class="info-grid">
+            <div class="info-card" style="color: #111;">
+                <h3>📡 Available Endpoints</h3>
+                <div class="endpoint-list">
+                    <div class="endpoint-item">
+                        <span class="method get">GET</span> / - Server info
+                    </div>
+                    <div class="endpoint-item">
+                        <span class="method get">GET</span> /health - Health check
+                    </div>
+                    <div class="endpoint-item">
+                        <span class="method get">GET</span> /funding-info - Economic parameters
+                    </div>
+                    <div class="endpoint-item">
+                        <span class="method post">POST</span> /auth/start - Create episode
+                    </div>
+                    <div class="endpoint-item">
+                        <span class="method post">POST</span> /auth/request-challenge - Request challenge
+                    </div>
+                    <div class="endpoint-item">
+                        <span class="method post">POST</span> /auth/verify - Submit verification
+                    </div>
+                    <div class="endpoint-item">
+                        <span class="method post">POST</span> /auth/revoke-session - Revoke session
+                    </div>
+                    <div class="endpoint-item">
+                        <span class="method get">GET</span> /auth/status/{id} - Episode status
+                    </div>
+                </div>
+            </div>
+            
+            <div class="info-card" style="color: #111;">
+                <h3>🔌 WebSocket Events</h3>
+                <div class="endpoint-list">
+                    <div class="endpoint-item">challenge_issued</div>
+                    <div class="endpoint-item">authentication_successful</div>
+                    <div class="endpoint-item">authentication_failed</div>
+                    <div class="endpoint-item">session_revoked</div>
+                    <div class="endpoint-item">episode_updated</div>
+                </div>
+            </div>
+            
+            <div class="info-card" style="color: #111;">
+                <h3>🛠️ Development Tools</h3>
+                <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 10px; margin: 10px 0; font-size: 0.9em; color: #111;">
+                    <strong>⚠️ CRITICAL for First-Time Users:</strong> Add <code>--bin kaspa-auth</code> to all cargo commands!<br>
+                    <strong>Example:</strong> <code>cargo run --bin kaspa-auth -- test-api-flow --server http://localhost:8080</code>
+                </div>
+                <div class="endpoint-list">
+                    <div class="endpoint-item">
+                        <strong>CLI Test:</strong><br>
+                        <code>cargo run --bin kaspa-auth -- test-api-flow --server http://localhost:8080</code>
+                    </div>
+                    <div class="endpoint-item">
+                        <strong>Manual Auth:</strong><br>
+                        <code>cargo run --bin kaspa-auth -- authenticate --peer http://localhost:8080</code>
+                    </div>
+                    <div class="endpoint-item">
+                        <strong>Start HTTP Peer:</strong><br>
+                        <code>cargo run --bin kaspa-auth -- http-peer --port 8080</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { secp256k1 } from "https://cdn.skypack.dev/@noble/curves@1.4.0/secp256k1";
+        import { sha256 } from "https://cdn.skypack.dev/@noble/hashes@1.4.0/sha256";
+
+        let websocket = null;
+        let currentEpisodeId = null;
+        let clientKaspaAddress = null; // Store globally for WebSocket access
+        let privateKey = null;
+        let publicKeyHex = null;
+
+        // Utility function to convert bytes to hex string (since bytesToHex from noble-hashes is problematic via CDN)
+        function bytesToHex(bytes) {
+            return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+        }
+        
+        // Status display function for logout flow
+        function showStatus(message) {
+            console.log('STATUS:', message);
+            // Could also update a status element on the page if needed
+            const statusElement = document.getElementById('statusMessage');
+            if (statusElement) {
+                statusElement.textContent = message;
+            }
+        }
+        
+        // WebSocket connection
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+            
+            websocket = new WebSocket(wsUrl);
+            
+            websocket.onopen = function() {
+                document.getElementById('wsStatus').textContent = '✅ Connected';
+                document.getElementById('wsStatus').className = 'connection-status connected';
+            };
+            
+            websocket.onmessage = function(event) {
+                const message = JSON.parse(event.data);
+                handleWebSocketMessage(message);
+            };
+            
+            websocket.onclose = function() {
+                document.getElementById('wsStatus').textContent = '❌ Disconnected';
+                document.getElementById('wsStatus').className = 'connection-status disconnected';
+                // Reconnect after 3 seconds
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+        
+        function handleWebSocketMessage(message) {
+            console.log('WebSocket message:', message);
+            
+            switch(message.type) {
+                case 'challenge_issued':
+                    // JavaScript-safe episode IDs can be compared directly
+                    if (message.episode_id === currentEpisodeId) {
+                        updateStep(4, 'complete');
+                        updateStep(5, 'active');
+                    }
+                    break;
+                    
+                case 'authentication_successful':
+                    // JavaScript-safe episode IDs can be compared directly
+                    if (message.episode_id === currentEpisodeId) {
+                        updateStep(6, 'complete');
+                        showSuccess(message.session_token, message.episode_id, clientKaspaAddress);
+                    }
+                    break;
+                    
+                case 'authentication_failed':
+                    alert('Authentication failed: ' + message.reason);
+                    resetUI();
+                    break;
+                    
+                case 'session_revoked':
+                    // Handle session revocation confirmation from blockchain
+                    if (message.episode_id === currentEpisodeId) {
+                        console.log('✅ Session revocation confirmed by blockchain');
+                        showSuccessfulLogout();
+                    }
+                    break;
+            }
+        }
+        
+        window.startAuthentication = async function() {
+            const button = document.getElementById('authButton');
+            const progress = document.getElementById('progressIndicator');
+            
+            button.disabled = true;
+            button.textContent = '🔄 Authenticating...';
+            progress.style.display = 'block';
+            
+            try {
+                // Step 1: Get/Create persistent client wallet (like CLI)
+                updateStep(1, 'active');
+                
+                const walletResponse = await fetch('/wallet/client');
+                if (!walletResponse.ok) {
+                    throw new Error(`Failed to get client wallet: ${walletResponse.status}`);
+                }
+                
+                const walletData = await walletResponse.json();
+                publicKeyHex = walletData.public_key;
+                clientKaspaAddress = walletData.kaspa_address; // Store globally
+                
+                console.log('🔍 DEBUG: Using persistent client wallet');
+                console.log('🔍 DEBUG: Public key:', publicKeyHex);
+                console.log('🔍 DEBUG: Client address:', clientKaspaAddress);
+                console.log('🔍 DEBUG: Was created:', walletData.was_created);
+                console.log('🔍 DEBUG: Needs funding:', walletData.needs_funding);
+                
+                // Update UI to show participant address
+                document.getElementById('clientAuthAddress').textContent = clientKaspaAddress;
+                
+                // Set participant explorer link
+                const participantExplorerUrl = `https://explorer-tn10.kaspa.org/addresses/${clientKaspaAddress}`;
+                const participantExplorerLink = document.getElementById('participantExplorerLink');
+                if (participantExplorerLink) {
+                    participantExplorerLink.href = participantExplorerUrl;
+                }
+                
+                if (walletData.needs_funding) {
+                    console.log('⚠️ WARNING: Participant wallet needs funding!');
+                    console.log('🚰 Get testnet funds: https://faucet.kaspanet.io/');
+                    console.log('💰 Send to address:', clientKaspaAddress);
+                    console.log('🎯 This is YOUR address - you fund authentication transactions');
+                    console.log('🔍 Check payment confirmation: ' + participantExplorerUrl);
+                }
+                
+                updateStep(1, 'complete');
+                
+                // Step 2: Create episode
+                updateStep(2, 'active');
+                const startResponse = await fetch('/auth/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ public_key: publicKeyHex })
+                });
+                
+                if (!startResponse.ok) {
+                    throw new Error(`Failed to start auth: ${startResponse.status}`);
+                }
+                
+                const startData = await startResponse.json();
+                currentEpisodeId = startData.episode_id;
+                // clientKaspaAddress already set from wallet data above
+                
+                console.log('🔍 DEBUG: Episode created:', currentEpisodeId);
+                console.log('🔍 DEBUG: Client Kaspa address:', clientKaspaAddress);
+                console.log('🔍 DEBUG: This is the address to check on explorer for AUTH transactions!');
+                
+                updateStep(2, 'complete');
+                
+                // Step 3: Request challenge
+                updateStep(3, 'active');
+                const challengeResponse = await fetch('/auth/request-challenge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        episode_id: currentEpisodeId,
+                        public_key: publicKeyHex
+                    })
+                });
+                
+                if (!challengeResponse.ok) {
+                    throw new Error(`Failed to request challenge: ${challengeResponse.status}`);
+                }
+                
+                updateStep(3, 'complete');
+                
+                // Step 4: Wait for challenge (WebSocket will handle this)
+                updateStep(4, 'active');
+                
+                // Poll for challenge if WebSocket doesn't deliver
+                let challenge = null;
+                for (let i = 0; i < 10; i++) {
+                    await sleep(1000);
+                    const statusResponse = await fetch(`/auth/status/${currentEpisodeId}`);
+                    if (statusResponse.ok) {
+                        const statusData = await statusResponse.json();
+                        if (statusData.challenge) {
+                            challenge = statusData.challenge;
+                            updateStep(4, 'complete');
+                            break;
+                        }
+                    }
+                }
+                
+                if (!challenge) {
+                    throw new Error('Timeout waiting for challenge');
+                }
+                
+                // Step 5: Sign challenge
+                updateStep(5, 'active');
+                const signature = await signChallenge(challenge);
+                updateStep(5, 'complete');
+                
+                // Step 6: Submit verification
+                updateStep(6, 'active');
+                const verifyResponse = await fetch('/auth/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        episode_id: currentEpisodeId,
+                        signature: signature,
+                        nonce: challenge
+                    })
+                });
+                
+                if (!verifyResponse.ok) {
+                    throw new Error(`Failed to verify: ${verifyResponse.status}`);
+                }
+                
+                const verifyData = await verifyResponse.json();
+                updateStep(6, 'complete');
+                
+                // Get final status
+                const finalStatusResponse = await fetch(`/auth/status/${currentEpisodeId}`);
+                if (finalStatusResponse.ok) {
+                    const finalStatus = await finalStatusResponse.json();
+                    if (finalStatus.session_token) {
+                        showSuccess(finalStatus.session_token, currentEpisodeId, clientKaspaAddress);
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Authentication error:', error);
+                alert(`Authentication failed: ${error.message}`);
+                resetUI();
+            }
+        }
+        
+        function updateStep(stepNumber, status) {
+            const step = document.getElementById(`step${stepNumber}`);
+            step.className = `progress-step ${status}`;
+        }
+        
+        function showSuccess(sessionToken, episodeId, clientKaspaAddress) {
+            document.getElementById('sessionToken').textContent = sessionToken;
+            document.getElementById('episodeId').textContent = episodeId;
+            document.getElementById('searchEpisodeId').textContent = episodeId;
+            document.getElementById('clientKaspaAddress').textContent = clientKaspaAddress;
+            
+            // Get server address for explorer link
+            const explorerUrl = `https://explorer-tn10.kaspa.org/addresses/${clientKaspaAddress}`;
+            document.getElementById('successExplorerLink').href = explorerUrl;
+            
+            document.getElementById('successCard').style.display = 'block';
+            
+            // Change button to logout mode
+            const button = document.getElementById('authButton');
+            const progress = document.getElementById('progressIndicator');
+            
+            button.disabled = false;
+            button.textContent = '🚪 Logout & Void Session';
+            button.style.background = 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)';
+            progress.style.display = 'none';
+            
+            // Store session info globally
+            window.currentSessionToken = sessionToken;
+            window.currentEpisodeId = episodeId;
+            window.isAuthenticated = true;
+        }
+        
+        function showSuccessfulLogout() {
+            const button = document.getElementById('authButton');
+            const success = document.getElementById('successCard');
+            
+            // Show successful logout status
+            showStatus('✅ Session revoked successfully on blockchain!');
+            console.log('✅ Session revocation confirmed by blockchain');
+            
+            // Update button to show successful logout status briefly
+            button.disabled = true;
+            button.textContent = '✅ Session Successfully Revoked!';
+            button.style.background = 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)'; // Green success color
+            
+            // Hide the success card (logged out state)
+            success.style.display = 'none';
+            
+            // Clear session state
+            window.currentSessionToken = null;
+            window.currentEpisodeId = null;
+            window.isAuthenticated = false;
+            currentEpisodeId = null;
+            
+            // After 3 seconds, restore the green authenticate button
+            setTimeout(() => {
+                button.disabled = false;
+                button.textContent = '🔑 Start Authentication Flow';
+                button.style.background = 'linear-gradient(135deg, #70c7ba 0%, #5db3a8 100%)'; // Original green
+                showStatus('🔄 Ready for new authentication');
+                
+                // Reset progress steps
+                for (let i = 1; i <= 6; i++) {
+                    updateStep(i, 'pending');
+                }
+            }, 3000); // 3-second delay to show success status
+        }
+        
+        function resetUI() {
+            const button = document.getElementById('authButton');
+            const progress = document.getElementById('progressIndicator');
+            const success = document.getElementById('successCard');
+            
+            button.disabled = false;
+            button.textContent = '🔑 Start Authentication Flow';
+            button.style.background = 'linear-gradient(135deg, #70c7ba 0%, #5db3a8 100%)'; // Reset to original color
+            progress.style.display = 'none';
+            success.style.display = 'none';
+            
+            // Reset all steps
+            for (let i = 1; i <= 6; i++) {
+                updateStep(i, 'pending');
+            }
+            
+            // Clear session state
+            currentEpisodeId = null;
+            privateKey = null;
+            publicKeyHex = null;
+            window.currentSessionToken = null;
+            window.currentEpisodeId = null;
+            window.isAuthenticated = false;
+        }
+        
+        async function logout() {
+            if (!window.isAuthenticated || !window.currentSessionToken) {
+                resetUI();
+                return;
+            }
+            
+            try {
+                // Show logout progress
+                const button = document.getElementById('authButton');
+                button.disabled = true;
+                button.textContent = '🔄 Revoking Session on Blockchain...';
+                
+                // Sign the session token to prove ownership (using server-side signing)
+                const signResponse = await fetch('/auth/sign-challenge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        challenge: window.currentSessionToken,
+                        private_key: "use_client_wallet" // Use persistent client wallet
+                    })
+                });
+                
+                if (!signResponse.ok) {
+                    throw new Error(`Failed to sign session token: ${signResponse.status}`);
+                }
+                
+                const signData = await signResponse.json();
+                const signatureHex = signData.signature;
+                
+                // Submit session revocation to blockchain
+                showStatus('🔄 Submitting session revocation to blockchain...');
+                
+                console.log('DEBUG: About to call /auth/revoke-session with:', {
+                    episode_id: window.currentEpisodeId,
+                    session_token: window.currentSessionToken,
+                    signature_length: signatureHex.length
+                });
+                
+                const response = await fetch('/auth/revoke-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        episode_id: window.currentEpisodeId,
+                        session_token: window.currentSessionToken,
+                        signature: signatureHex
+                    })
+                });
+                
+                console.log('DEBUG: Response status:', response.status);
+                console.log('DEBUG: Response ok:', response.ok);
+                
+                const result = await response.json();
+                console.log('DEBUG: Response body:', result);
+                
+                if (response.ok) {
+                    console.log('🔄 Session revocation transaction submitted:', result.transaction_id);
+                    showStatus('⏳ Waiting for blockchain confirmation...');
+                    
+                    // Wait for WebSocket notification of session revocation
+                    // The WebSocket will update the UI when the blockchain confirms
+                    console.log('🚪 Session revocation in progress:', window.currentSessionToken);
+                    
+                } else {
+                    throw new Error(result.error || `HTTP ${response.status}: Session revocation failed`);
+                }
+                
+            } catch (error) {
+                console.error('Blockchain logout error:', error);
+                const errorMessage = error.message || error.toString() || 'Unknown error';
+                alert(`Logout failed: ${errorMessage}`);
+                showStatus(`❌ Logout failed: ${errorMessage}`);
+                
+                // Reset button state on error
+                const button = document.getElementById('authButton');
+                button.disabled = false;
+                button.textContent = '🚪 Logout & Void Session';
+            }
+        }
+        
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+        
+        // Smart button handler - decides between authentication and logout
+        window.handleAuthButton = function() {
+            if (window.isAuthenticated) {
+                logout();
+            } else {
+                startAuthentication();
+            }
+        }
+
+        async function signChallenge(challenge) {
+            // Use server-side signing with persistent client wallet
+            const response = await fetch('/auth/sign-challenge', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    challenge: challenge,
+                    private_key: "use_client_wallet" // Signal to use persistent client wallet
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to sign challenge: ${response.status}`);
+            }
+            
+            const signData = await response.json();
+            return signData.signature;
+        }
+        
+        // Load funding information
+        async function loadFundingInfo() {
+            try {
+                // Load server info
+                const response = await fetch('/funding-info');
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    const serverAddressEl = document.getElementById('serverAddress');
+                    const networkInfoEl = document.getElementById('networkInfo');
+                    const txPrefixEl = document.getElementById('txPrefix');
+                    
+                    if (serverAddressEl) serverAddressEl.textContent = data.funding_address;
+                    if (networkInfoEl) networkInfoEl.textContent = data.network;
+                    if (txPrefixEl) txPrefixEl.textContent = data.transaction_prefix + ' (' + data.transaction_prefix_meaning + ')';
+                    
+                    // Set explorer link to correct testnet explorer
+                    const explorerUrl = `https://explorer-tn10.kaspa.org/addresses/${data.funding_address}`;
+                    const explorerLinkEl = document.getElementById('explorerLink');
+                    if (explorerLinkEl) explorerLinkEl.href = explorerUrl;
+                }
+                
+                // Load client wallet status
+                const walletResponse = await fetch('/wallet/status');
+                if (walletResponse.ok) {
+                    const walletData = await walletResponse.json();
+                    
+                    if (walletData.exists) {
+                        document.getElementById('clientAuthAddress').textContent = walletData.kaspa_address;
+                        
+                        if (walletData.needs_funding) {
+                            document.getElementById('clientAuthAddress').style.color = '#e53e3e';
+                            document.getElementById('clientAuthAddress').textContent += ' (NEEDS FUNDING)';
+                        } else {
+                            document.getElementById('clientAuthAddress').style.color = '#22c55e';
+                        }
+                    } else {
+                        document.getElementById('clientAuthAddress').textContent = 'Will be created on first authentication';
+                    }
+                }
+                
+                // Show the funding info section
+                document.getElementById('fundingInfo').style.display = 'block';
+            } catch (error) {
+                console.error('Error loading funding info:', error);
+            }
+        }
+        
+        // Reset episodes function
+        async function resetEpisodes() {
+            if (!confirm('Are you sure you want to reset all episodes? This will force creation of new episodes on next authentication.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/auth/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    alert(`✅ ${data.message}\nEpisodes cleared: ${data.episodes_cleared}`);
+                    
+                    // Reset UI state
+                    document.getElementById('successCard').style.display = 'none';
+                    document.getElementById('progressIndicator').style.display = 'none';
+                    document.getElementById('authButton').textContent = '🔑 Start Authentication Flow';
+                    
+                    // Reset all progress steps
+                    for (let i = 1; i <= 6; i++) {
+                        const step = document.getElementById(`step${i}`);
+                        step.className = 'progress-step pending';
+                    }
+                } else {
+                    alert('❌ Failed to reset episodes');
+                }
+            } catch (error) {
+                console.error('Reset error:', error);
+                alert('❌ Error resetting episodes');
+            }
+        }
+        
+        // Initialize WebSocket connection and load funding info when page loads
+        window.addEventListener('load', function() {
+            connectWebSocket();
+            loadFundingInfo();
+        });
+
+        window.startAuthentication = startAuthentication;
+    </script>
+</body>
+</html>

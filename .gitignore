@@ -12,3 +12,16 @@ testing/integration/perflogs*
 Servers.toml
 release
 package-sizes.js
+
+# Local development files
+.claude/
+
+# SECURITY: Never commit private keys or wallet files
+.kaspa-auth/
+**/*.key
+**/wallet*.json
+**/private*.key
+
+# Future examples - keep in dev branch only, hide from master
+examples/kaspa-poker-tournament/
+examples/episode-contract/

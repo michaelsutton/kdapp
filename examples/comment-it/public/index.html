@@ -1,0 +1,1824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COMMENT IT - Episode-Based Thoughts on the Kaspa Blockchain</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;600&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary-teal: #14b8a6;
+            --bright-teal: #2dd4bf;
+            --cyan: #06b6d4;
+            --bright-cyan: #22d3ee;
+            --bg-black: #0a0a0a;
+            --bg-dark: #111111;
+            --bg-panel: #1a1a1a;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+        
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-black);
+            color: #ffffff;
+            overflow-x: hidden;
+            position: relative;
+        }
+        
+        /* Matrix rain background */
+        .matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: -2;
+            opacity: 0.05;
+        }
+        
+        .matrix-column {
+            position: absolute;
+            top: -100%;
+            font-family: monospace;
+            font-size: 14px;
+            color: var(--primary-teal);
+            animation: matrix-fall linear infinite;
+            text-shadow: 0 0 5px currentColor;
+        }
+        
+        @keyframes matrix-fall {
+            to {
+                transform: translateY(200vh);
+            }
+        }
+        
+        /* Scanline effect */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                transparent 50%,
+                rgba(20, 184, 166, 0.03) 50%
+            );
+            background-size: 100% 4px;
+            z-index: -1;
+            pointer-events: none;
+            animation: scanline 8s linear infinite;
+        }
+        
+        @keyframes scanline {
+            0% {
+                transform: translateY(0);
+            }
+            100% {
+                transform: translateY(10px);
+            }
+        }
+        
+        /* Main container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            position: relative;
+        }
+        
+        .logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 4rem;
+            font-weight: 900;
+            letter-spacing: 0.2em;
+            color: var(--bright-teal);
+            text-shadow: 
+                0 0 10px var(--primary-teal),
+                0 0 20px var(--primary-teal),
+                0 0 30px var(--primary-teal),
+                0 0 40px var(--cyan);
+            animation: glow-pulse 2s ease-in-out infinite;
+            margin-bottom: 10px;
+            position: relative;
+            display: inline-block;
+        }
+        
+        @keyframes glow-pulse {
+            0%, 100% {
+                filter: brightness(1);
+            }
+            50% {
+                filter: brightness(1.2);
+            }
+        }
+        
+        .logo:hover {
+            animation: glitch 0.3s infinite;
+        }
+        
+        @keyframes glitch {
+            0%, 100% {
+                text-shadow: 
+                    0 0 10px var(--primary-teal),
+                    0 0 20px var(--primary-teal),
+                    0 0 30px var(--primary-teal),
+                    0 0 40px var(--cyan);
+            }
+            25% {
+                text-shadow: 
+                    -2px 0 var(--error),
+                    0 0 10px var(--primary-teal),
+                    0 0 20px var(--primary-teal),
+                    0 0 30px var(--primary-teal),
+                    0 0 40px var(--cyan);
+            }
+            50% {
+                text-shadow: 
+                    2px 0 var(--bright-cyan),
+                    0 0 10px var(--primary-teal),
+                    0 0 20px var(--primary-teal),
+                    0 0 30px var(--primary-teal),
+                    0 0 40px var(--cyan);
+            }
+        }
+        
+        .tagline {
+            font-size: 0.9rem;
+            color: var(--bright-cyan);
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            opacity: 0.8;
+        }
+        
+        /* Status bar */
+        .status-bar {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: var(--bg-panel);
+            border: 1px solid var(--primary-teal);
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .status-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, var(--primary-teal), transparent);
+            opacity: 0.3;
+            animation: status-sweep 3s infinite;
+        }
+        
+        @keyframes status-sweep {
+            0% {
+                left: -100%;
+            }
+            100% {
+                left: 100%;
+            }
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse-dot 2s infinite;
+        }
+        
+        @keyframes pulse-dot {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.5;
+                transform: scale(1.5);
+            }
+        }
+        
+        .status-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--bright-teal);
+        }
+        
+        .status-value {
+            font-weight: 600;
+            color: #ffffff;
+        }
+        
+        /* Auth panel */
+        .auth-panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--primary-teal);
+            border-radius: 8px;
+            padding: 30px;
+            margin: 30px auto;
+            max-width: 500px;
+            position: relative;
+            box-shadow: 
+                0 0 20px rgba(20, 184, 166, 0.3),
+                inset 0 0 20px rgba(20, 184, 166, 0.1);
+        }
+        
+        .panel-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--bright-teal);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .panel-title::before {
+            content: '>';
+            color: var(--bright-cyan);
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0;
+            }
+        }
+        
+        .connect-button {
+            width: 100%;
+            padding: 15px;
+            background: transparent;
+            border: 2px solid var(--primary-teal);
+            color: var(--bright-teal);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+        
+        .connect-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: var(--primary-teal);
+            transition: left 0.3s;
+            z-index: -1;
+        }
+        
+        .connect-button:hover {
+            color: var(--bg-black);
+            text-shadow: none;
+            box-shadow: 
+                0 0 20px var(--primary-teal),
+                inset 0 0 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .connect-button:hover::before {
+            left: 0;
+        }
+        
+        /* Comment form */
+        .comment-form {
+            background: var(--bg-panel);
+            border: 1px solid var(--primary-teal);
+            border-radius: 8px;
+            padding: 30px;
+            margin: 30px auto;
+            max-width: 800px;
+            position: relative;
+        }
+        
+        .terminal-input {
+            width: 100%;
+            background: var(--bg-black);
+            border: 1px solid var(--primary-teal);
+            color: var(--bright-cyan);
+            padding: 15px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            resize: vertical;
+            min-height: 150px;
+            margin: 20px 0;
+        }
+        
+        .terminal-input:focus {
+            outline: none;
+            box-shadow: 
+                0 0 10px var(--primary-teal),
+                inset 0 0 10px rgba(20, 184, 166, 0.1);
+        }
+        
+        .terminal-prefix {
+            color: var(--bright-teal);
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+        
+        .form-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
+        .char-counter {
+            color: var(--primary-teal);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+        
+        /* Comments section */
+        .comments-section {
+            max-width: 800px;
+            margin: 40px auto;
+        }
+        
+        .comment-card {
+            background: var(--bg-panel);
+            border: 1px solid var(--primary-teal);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+            animation: comment-appear 0.5s ease-out;
+        }
+        
+        @keyframes comment-appear {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .comment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 0.8rem;
+            color: var(--primary-teal);
+        }
+        
+        .comment-author {
+            font-weight: 600;
+        }
+        
+        .comment-meta {
+            display: flex;
+            gap: 15px;
+            font-size: 0.7rem;
+            opacity: 0.7;
+        }
+        
+        .comment-body {
+            color: #ffffff;
+            line-height: 1.6;
+            word-wrap: break-word;
+        }
+        
+        .verify-link {
+            color: var(--bright-cyan);
+            text-decoration: none;
+            font-size: 0.8rem;
+            margin-top: 10px;
+            display: inline-block;
+            transition: all 0.3s;
+        }
+        
+        .verify-link:hover {
+            color: var(--bright-teal);
+            text-shadow: 0 0 10px currentColor;
+        }
+        
+        /* Network stats sidebar */
+        .stats-panel {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--bg-panel);
+            border: 1px solid var(--primary-teal);
+            border-radius: 8px;
+            padding: 20px;
+            width: 250px;
+            opacity: 0.9;
+        }
+        
+        @media (max-width: 1400px) {
+            .stats-panel {
+                position: static;
+                transform: none;
+                margin: 30px auto;
+                width: 100%;
+                max-width: 500px;
+            }
+        }
+        
+        .stats-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1rem;
+            color: var(--bright-teal);
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(20, 184, 166, 0.2);
+            font-size: 0.8rem;
+        }
+        
+        .stat-label {
+            color: var(--primary-teal);
+        }
+        
+        .stat-value {
+            color: #ffffff;
+            font-weight: 600;
+        }
+        
+        /* Footer */
+        .footer {
+            text-align: center;
+            margin-top: 60px;
+            padding: 30px 0;
+            border-top: 1px solid rgba(20, 184, 166, 0.3);
+            font-size: 0.8rem;
+            color: var(--primary-teal);
+        }
+        
+        .footer a {
+            color: var(--bright-cyan);
+            text-decoration: none;
+            margin: 0 10px;
+            transition: all 0.3s;
+        }
+        
+        .footer a:hover {
+            color: var(--bright-teal);
+            text-shadow: 0 0 10px currentColor;
+        }
+        
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .logo {
+                font-size: 2.5rem;
+            }
+            
+            .status-bar {
+                gap: 15px;
+            }
+            
+            .status-item {
+                padding: 8px 15px;
+                font-size: 0.8rem;
+            }
+            
+            .auth-panel,
+            .comment-form {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Matrix rain background -->
+    <div class="matrix-bg" id="matrixBg"></div>
+    
+    <!-- Scanline effect -->
+    <div class="scanlines"></div>
+    
+    <!-- Main container -->
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1 class="logo">COMMENT IT</h1>
+            <p class="tagline">Episode-Based Thoughts on the Kaspa Blockchain</p>
+        </header>
+        
+        <!-- Status bar -->
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-dot"></div>
+                <span class="status-label">Network</span>
+                <span class="status-value">ONLINE</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Participant</span>
+                <span class="status-value" id="walletAddress">kaspa:qrxx...v8wz</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Block</span>
+                <span class="status-value" id="blockHeight">7,531,843</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Episode</span>
+                <span class="status-value" id="episodeId">--</span>
+            </div>
+        </div>
+        
+        <!-- Wallet Management Panel -->
+        <div class="auth-panel" id="walletPanel">
+            <h2 class="panel-title">KASPA WALLET SETUP</h2>
+            <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-black); border: 1px solid rgba(20, 184, 166, 0.3); border-radius: 4px;">
+                <p style="font-size: 0.8rem; color: var(--primary-teal); margin-bottom: 10px;">🔐 CRYPTOGRAPHIC IDENTITY REQUIRED</p>
+                <p style="font-size: 0.7rem; color: rgba(255,255,255,0.6); line-height: 1.4;">
+                    To participate in authenticated episodes, you need a Kaspa wallet. Choose to create a new wallet or import an existing one.
+                </p>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button class="connect-button" onclick="showCreateWallet()" style="flex: 1;">
+                    [ CREATE NEW WALLET ]
+                </button>
+                <button class="connect-button" onclick="showImportWallet()" style="flex: 1;">
+                    [ IMPORT WALLET ]
+                </button>
+            </div>
+            
+            <!-- Create Wallet Section -->
+            <div id="createWalletSection" style="display: none;">
+                <h3 style="color: var(--bright-teal); font-size: 1rem; margin-bottom: 15px;">🆕 CREATE NEW WALLET</h3>
+                <div style="background: var(--bg-black); padding: 15px; border: 1px solid var(--warning); border-radius: 4px; margin-bottom: 15px;">
+                    <p style="color: var(--warning); font-size: 0.8rem; margin-bottom: 10px;">⚠️ CRITICAL: BACKUP YOUR PRIVATE KEY</p>
+                    <p style="color: rgba(255,255,255,0.8); font-size: 0.7rem; line-height: 1.4;">
+                        Your private key is the ONLY way to access your wallet. If you lose it, you lose access forever. 
+                        Copy it to a secure location immediately.
+                    </p>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; color: var(--primary-teal); font-size: 0.8rem; margin-bottom: 5px;">
+                        🔑 Your Private Key (COPY THIS IMMEDIATELY):
+                    </label>
+                    <textarea id="generatedPrivateKey" readonly 
+                        style="width: 100%; height: 80px; background: var(--bg-black); border: 1px solid var(--bright-cyan); color: var(--bright-cyan); padding: 10px; font-family: monospace; font-size: 0.8rem; resize: none;"
+                        placeholder="Click 'Generate New Wallet' to create your private key..."></textarea>
+                    <button onclick="copyPrivateKey()" id="copyKeyButton" 
+                        style="margin-top: 5px; padding: 5px 15px; background: var(--primary-teal); border: none; color: var(--bg-black); border-radius: 3px; cursor: pointer; font-size: 0.7rem;" 
+                        disabled>
+                        📋 COPY KEY
+                    </button>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" id="saveToFileCheck" style="width: 16px; height: 16px; accent-color: var(--primary-teal);">
+                        <span style="color: var(--bright-cyan); font-size: 0.8rem;">Save private key to local file (.kaspa-auth/web-participant-peer-wallet.key)</span>
+                    </label>
+                    <small style="color: var(--primary-teal); margin-left: 26px; font-size: 0.7rem;">
+                        Convenient but less secure. Only enable on trusted devices.
+                    </small>
+                </div>
+                
+                <button class="connect-button" onclick="generateNewWallet()" id="generateButton">
+                    [ GENERATE NEW WALLET ]
+                </button>
+                <button class="connect-button" onclick="proceedWithWallet()" id="proceedNewButton" 
+                    style="margin-top: 10px; background: var(--success); border-color: var(--success); display: none;">
+                    [ USE THIS WALLET & CONTINUE ]
+                </button>
+            </div>
+            
+            <!-- Import Wallet Section -->
+            <div id="importWalletSection" style="display: none;">
+                <h3 style="color: var(--bright-teal); font-size: 1rem; margin-bottom: 15px;">📥 IMPORT EXISTING WALLET</h3>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; color: var(--primary-teal); font-size: 0.8rem; margin-bottom: 5px;">
+                        🔑 Paste Your Private Key:
+                    </label>
+                    <textarea id="importPrivateKey" 
+                        style="width: 100%; height: 80px; background: var(--bg-black); border: 1px solid var(--primary-teal); color: var(--bright-cyan); padding: 10px; font-family: monospace; font-size: 0.8rem; resize: none;"
+                        placeholder="Paste your 64-character hexadecimal private key here..."></textarea>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" id="saveImportedToFileCheck" style="width: 16px; height: 16px; accent-color: var(--primary-teal);">
+                        <span style="color: var(--bright-cyan); font-size: 0.8rem;">Save imported key to local file (.kaspa-auth/web-participant-peer-wallet.key)</span>
+                    </label>
+                    <small style="color: var(--primary-teal); margin-left: 26px; font-size: 0.7rem;">
+                        Convenient for future sessions. Only enable on trusted devices.
+                    </small>
+                </div>
+                
+                <button class="connect-button" onclick="validateAndImportWallet()" id="importButton">
+                    [ VALIDATE & IMPORT WALLET ]
+                </button>
+            </div>
+        </div>
+
+        <!-- Auth panel (hidden initially) -->
+        <div class="auth-panel" id="authPanel" style="display: none;">
+            <h2 class="panel-title">INITIATE AUTHENTICATION EPISODE</h2>
+            <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-black); border: 1px solid rgba(20, 184, 166, 0.3); border-radius: 4px;">
+                <p style="font-size: 0.8rem; color: var(--primary-teal); margin-bottom: 10px;">POWERED BY KDAPP FRAMEWORK</p>
+                <p style="font-size: 0.7rem; color: rgba(255,255,255,0.6); line-height: 1.4;">
+                    True peer-to-peer authentication on Kaspa blockchain. Your session is cryptographically secured by episode-based coordination.
+                </p>
+            </div>
+            
+            <div style="margin-bottom: 15px; padding: 10px; background: rgba(20, 184, 166, 0.1); border: 1px solid var(--primary-teal); border-radius: 4px;">
+                <p style="color: var(--bright-cyan); font-size: 0.8rem; margin-bottom: 5px;">🔑 Active Wallet:</p>
+                <p style="color: rgba(255,255,255,0.8); font-size: 0.7rem; font-family: monospace;" id="activeWalletAddress">
+                    Loading...
+                </p>
+                <button onclick="changeWallet()" style="margin-top: 8px; padding: 4px 12px; background: transparent; border: 1px solid var(--primary-teal); color: var(--primary-teal); border-radius: 3px; cursor: pointer; font-size: 0.7rem;">
+                    Change Wallet
+                </button>
+            </div>
+            
+            <button class="connect-button" id="authButton" onclick="connectWallet()">
+                [ CREATE AUTH EPISODE ]
+            </button>
+            <button class="connect-button" id="logoutButton" onclick="logout()" style="display: none; margin-top: 10px; background: var(--error); border-color: var(--error);">
+                [ LOGOUT ]
+            </button>
+            <div style="margin-top: 20px;">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" id="anonMode" style="width: 20px; height: 20px; accent-color: var(--primary-teal);">
+                    <span style="color: var(--bright-cyan); font-size: 0.9rem;">EPISODE ANONYMOUS MODE</span>
+                </label>
+                <small style="color: var(--primary-teal); margin-top: 5px; display: block; line-height: 1.4;">
+                    Anonymous: Shorter comments, no replies, temporary identity<br>
+                    Authenticated: Full features, persistent identity, blockchain verification
+                </small>
+            </div>
+        </div>
+        
+        <!-- Comment form -->
+        <div class="comment-form" id="commentForm" style="display: none;">
+            <h2 class="panel-title">SUBMIT EPISODE MESSAGE</h2>
+            <div style="display: flex; gap: 20px; margin-bottom: 15px; flex-wrap: wrap;">
+                <div style="font-size: 0.8rem; color: var(--primary-teal);">
+                    AUTH EPISODE: <span style="color: var(--bright-cyan);" id="authEpisodeDisplay">--</span>
+                </div>
+                <div style="font-size: 0.8rem; color: var(--primary-teal);">
+                    SESSION: <span style="color: var(--success);">ACTIVE</span>
+                </div>
+            </div>
+            <div class="terminal-prefix">participant@kaspa:~$</div>
+            <textarea class="terminal-input" placeholder="Enter your episode message..." id="commentInput" maxlength="1000"></textarea>
+            <div class="form-footer">
+                <div class="char-counter">
+                    BYTES REMAINING: <span id="charCount">1000</span>
+                </div>
+                <button class="connect-button" style="width: auto; padding: 10px 30px;" onclick="submitComment()">
+                    [ SUBMIT TO EPISODE ]
+                </button>
+            </div>
+        </div>
+        
+        <!-- Comments section -->
+        <div class="comments-section">
+            <h2 class="panel-title" style="margin-bottom: 30px;">EPISODE TRANSMISSION LOG</h2>
+            <div id="commentsContainer">
+                <!-- Example comment -->
+                <div class="comment-card">
+                    <div class="comment-header">
+                        <span class="comment-author">kaspa:qryy...x3nz</span>
+                        <div class="comment-meta">
+                            <span>EPISODE: 847293</span>
+                            <span>BLOCK: 7,531,840</span>
+                        </div>
+                    </div>
+                    <div class="comment-body">
+                        The Kaspa blockchain never forgets. Our episode messages are immutable now.
+                    </div>
+                    <a href="https://explorer-tn10.kaspa.org/addresses/kaspatest:qzf2gqefp9xsws75380uwzgnah4mttmavgkqv8kx6kam688rwc6wjar5dzz7u" target="_blank" class="verify-link">[ VERIFY ON KASPA EXPLORER → ]</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Network stats sidebar -->
+        <div class="stats-panel">
+            <h3 class="stats-title">KDAPP Network Stats</h3>
+            <div class="stat-item">
+                <span class="stat-label">Organizer Peers</span>
+                <span class="stat-value" id="organizerPeers">1</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Auth Episodes</span>
+                <span class="stat-value" id="authEpisodes">3,847</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Comment Episodes</span>
+                <span class="stat-value" id="commentEpisodes">15,234</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">DAA Score</span>
+                <span class="stat-value" id="daaScore">28,847,293</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Kaspa TPS</span>
+                <span class="stat-value">10 BPS</span>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <footer class="footer">
+            <p>RUNNING ON KASPA TESTNET-10 • POWERED BY KDAPP FRAMEWORK</p>
+            <p>
+                <a href="#">[ JOIN THE P2P NETWORK ]</a>
+                <span style="color: var(--primary-teal);">•</span>
+                <a href="#">[ VIEW ON GITHUB ]</a>
+                <span style="color: var(--primary-teal);">•</span>
+                <span>CONNECTED TO <span id="peerCount">7</span> KASPA NODES</span>
+            </p>
+            <p style="margin-top: 15px; font-size: 0.7rem; opacity: 0.7;">
+                TX PREFIX: 0x41555448 (AUTH) • 0x434F4D4D (COMM) • EPISODE-BASED P2P ARCHITECTURE
+            </p>
+            <p style="margin-top: 10px; font-size: 0.6rem; opacity: 0.6;">
+                MULTI-ORGANIZER RESILIENCE • AUTOMATIC FAILOVER • CENSORSHIP RESISTANT
+            </p>
+        </footer>
+    </div>
+    
+    <script>
+        // Matrix rain effect
+        function createMatrixRain() {
+            const matrix = document.getElementById('matrixBg');
+            const characters = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
+            
+            for (let i = 0; i < 50; i++) {
+                const column = document.createElement('div');
+                column.className = 'matrix-column';
+                column.style.left = Math.random() * 100 + '%';
+                column.style.animationDuration = (Math.random() * 15 + 10) + 's';
+                column.style.animationDelay = Math.random() * 10 + 's';
+                
+                let text = '';
+                for (let j = 0; j < 50; j++) {
+                    text += characters[Math.floor(Math.random() * characters.length)] + '<br>';
+                }
+                column.innerHTML = text;
+                matrix.appendChild(column);
+            }
+        }
+        
+        // Initialize matrix rain
+        createMatrixRain();
+        
+        // Simulate block height updates
+        setInterval(() => {
+            const blockHeight = document.getElementById('blockHeight');
+            const currentHeight = parseInt(blockHeight.textContent.replace(/,/g, ''));
+            blockHeight.textContent = (currentHeight + 1).toLocaleString();
+        }, 5000);
+        
+        // DOM initialization - move to DOMContentLoaded
+        document.addEventListener('DOMContentLoaded', () => {
+            // Character counter (default for anonymous)
+            const commentInput = document.getElementById('commentInput');
+            const charCount = document.getElementById('charCount');
+            
+            if (commentInput && charCount) {
+                commentInput.addEventListener('input', () => {
+                    const remaining = 1000 - commentInput.value.length;
+                    charCount.textContent = remaining;
+                    charCount.style.color = remaining < 100 ? 'var(--warning)' : 'var(--primary-teal)';
+                });
+            }
+            
+            // Anonymous mode toggle
+            const anonMode = document.getElementById('anonMode');
+            if (anonMode) {
+                anonMode.addEventListener('change', handleAnonymousMode);
+            }
+            
+            // Initialize organizer peer count
+            const orgPeersElement = document.getElementById('organizerPeers');
+            if (orgPeersElement) {
+                const enabledOrganizers = availableOrganizers.filter(org => org.enabled);
+                orgPeersElement.textContent = enabledOrganizers.length;
+            }
+            
+            // Check for existing wallet
+            checkExistingWallet();
+        });
+        
+        // Global state - DECLARE FIRST
+        let currentEpisodeId = null;
+        let currentSessionToken = null;
+        let webSocket = null;
+        let isAuthenticated = false;
+        let isProcessingChallenge = false; // Prevent duplicate challenge processing
+        let availableOrganizers = [
+            { name: 'local-development', url: window.location.origin, priority: 1, enabled: true },
+            { name: 'project-official', url: 'https://comments1.kaspa.community', priority: 2, enabled: false },
+            { name: 'community-backup', url: 'https://comments2.kaspa.community', priority: 3, enabled: false }
+        ];
+        let currentOrganizerIndex = 0;
+        let currentWallet = null;
+        
+        // Helper function to truncate Kaspa addresses for display
+        function truncateKaspaAddress(address) {
+            if (!address || address.length <= 28) return address;
+            return address.substring(0, 20) + '...' + address.substring(address.length - 8);
+        }
+        
+        // Removed - now in DOMContentLoaded
+        
+        // Resilient P2P peer connection with automatic fallback
+        async function resilientFetch(path, options = {}) {
+            const enabledOrganizers = availableOrganizers.filter(org => org.enabled);
+            
+            if (enabledOrganizers.length === 0) {
+                throw new Error('No enabled organizer peers available');
+            }
+            
+            let lastError = null;
+            
+            for (const organizer of enabledOrganizers) {
+                try {
+                    console.log(`🎯 Trying organizer '${organizer.name}' at ${organizer.url}`);
+                    
+                    const url = organizer.url + path;
+                    const response = await fetch(url, {
+                        ...options,
+                        timeout: 30000 // 30 second timeout
+                    });
+                    
+                    if (response.ok) {
+                        console.log(`✅ SUCCESS on organizer '${organizer.name}'`);
+                        updateOrganizerStatus(organizer.name, 'success');
+                        return response;
+                    } else if (response.status === 503) {
+                        // Wallet needs funding - special handling
+                        throw new Error(`WALLET_NEEDS_FUNDING: Your wallet needs funding for blockchain transactions. Visit https://faucet.kaspanet.io/ and fund address: ${currentWallet.kaspaAddress}`);
+                    } else {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                } catch (error) {
+                    console.log(`❌ Failed on organizer '${organizer.name}': ${error.message}`);
+                    updateOrganizerStatus(organizer.name, 'failure');
+                    lastError = error;
+                    
+                    // Small delay before trying next organizer
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+            
+            throw new Error(`All organizer peers failed. Last error: ${lastError.message}`);
+        }
+        
+        // Update organizer status display
+        function updateOrganizerStatus(organizerName, status) {
+            // Update peer count display based on successful connections
+            const successfulConnections = availableOrganizers.filter(org => org.lastStatus === 'success').length;
+            document.getElementById('peerCount').textContent = Math.max(1, successfulConnections);
+            
+            // Store status for the organizer
+            const organizer = availableOrganizers.find(org => org.name === organizerName);
+            if (organizer) {
+                organizer.lastStatus = status;
+                organizer.lastTried = Date.now();
+            }
+        }
+        
+        // Wallet Management Functions
+        
+        function showCreateWallet() {
+            document.getElementById('createWalletSection').style.display = 'block';
+            document.getElementById('importWalletSection').style.display = 'none';
+        }
+        
+        function showImportWallet() {
+            document.getElementById('createWalletSection').style.display = 'none';
+            document.getElementById('importWalletSection').style.display = 'block';
+        }
+        
+        async function generateNewWallet() {
+            const button = document.getElementById('generateButton');
+            const originalText = button.textContent;
+            button.textContent = '[ GENERATING... ]';
+            button.disabled = true;
+            
+            try {
+                // Generate a random 32-byte private key
+                const privateKeyBytes = new Uint8Array(32);
+                crypto.getRandomValues(privateKeyBytes);
+                const privateKeyHex = Array.from(privateKeyBytes)
+                    .map(b => b.toString(16).padStart(2, '0'))
+                    .join('');
+                
+                // Display the private key
+                document.getElementById('generatedPrivateKey').value = privateKeyHex;
+                document.getElementById('copyKeyButton').disabled = false;
+                document.getElementById('proceedNewButton').style.display = 'block';
+                
+                // Store temporarily for use
+                currentWallet = { privateKey: privateKeyHex, wasCreated: true };
+                
+                button.textContent = '[ WALLET GENERATED ]';
+                button.style.background = 'var(--success)';
+                button.style.borderColor = 'var(--success)';
+                
+                typewriterEffect('WALLET GENERATED! COPY YOUR PRIVATE KEY IMMEDIATELY!', button.parentElement);
+                
+            } catch (error) {
+                console.error('Wallet generation failed:', error);
+                button.textContent = originalText;
+                button.disabled = false;
+                typewriterEffect('ERROR: Failed to generate wallet', button.parentElement);
+            }
+        }
+        
+        function copyPrivateKey() {
+            const privateKey = document.getElementById('generatedPrivateKey').value;
+            navigator.clipboard.writeText(privateKey).then(() => {
+                const button = document.getElementById('copyKeyButton');
+                const originalText = button.textContent;
+                button.textContent = '✅ COPIED';
+                button.style.background = 'var(--success)';
+                
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.style.background = 'var(--primary-teal)';
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                alert('Failed to copy private key. Please select and copy manually.');
+            });
+        }
+        
+        async function validateAndImportWallet() {
+            const button = document.getElementById('importButton');
+            const originalText = button.textContent;
+            const privateKeyInput = document.getElementById('importPrivateKey');
+            const privateKey = privateKeyInput.value.trim();
+            
+            button.textContent = '[ VALIDATING... ]';
+            button.disabled = true;
+            
+            try {
+                // Validate private key format (64 hex characters)
+                if (!/^[0-9a-fA-F]{64}$/.test(privateKey)) {
+                    throw new Error('Invalid private key format. Must be 64 hexadecimal characters.');
+                }
+                
+                // Store the imported wallet
+                currentWallet = { privateKey: privateKey, wasCreated: false };
+                
+                button.textContent = '[ WALLET IMPORTED ]';
+                button.style.background = 'var(--success)';
+                button.style.borderColor = 'var(--success)';
+                
+                // Proceed to authentication
+                await proceedWithWallet();
+                
+            } catch (error) {
+                console.error('Wallet import failed:', error);
+                button.textContent = originalText;
+                button.disabled = false;
+                typewriterEffect(`IMPORT ERROR: ${error.message}`, button.parentElement);
+                privateKeyInput.style.borderColor = 'var(--error)';
+                
+                setTimeout(() => {
+                    privateKeyInput.style.borderColor = 'var(--primary-teal)';
+                }, 3000);
+            }
+        }
+        
+        async function proceedWithWallet() {
+            if (!currentWallet || !currentWallet.privateKey) {
+                alert('No wallet available. Please create or import a wallet first.');
+                return;
+            }
+            
+            try {
+                // Check if user wants to save to file
+                const saveToFile = currentWallet.wasCreated ? 
+                    document.getElementById('saveToFileCheck').checked :
+                    document.getElementById('saveImportedToFileCheck').checked;
+                
+                if (saveToFile) {
+                    // Send the private key to backend for storage
+                    const response = await resilientFetch('/wallet-participant', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            private_key: currentWallet.privateKey,
+                            save_to_file: true
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    
+                    currentWallet.kaspaAddress = data.kaspa_address;
+                    currentWallet.publicKey = data.public_key;
+                } else {
+                    // Use the wallet without saving to file (more secure)
+                    const response = await resilientFetch('/wallet-participant', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            private_key: currentWallet.privateKey,
+                            save_to_file: false
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    
+                    currentWallet.kaspaAddress = data.kaspa_address;
+                    currentWallet.publicKey = data.public_key;
+                }
+                
+                // Show authentication panel
+                showAuthPanel();
+                
+            } catch (error) {
+                console.error('Wallet setup failed:', error);
+                typewriterEffect(`SETUP ERROR: ${error.message}`, document.getElementById('walletPanel'));
+            }
+        }
+        
+        function showAuthPanel() {
+            // Hide wallet panel
+            document.getElementById('walletPanel').style.display = 'none';
+            
+            // Show auth panel
+            document.getElementById('authPanel').style.display = 'block';
+            
+            // Update active wallet display with truncated address
+            const truncatedAddress = truncateKaspaAddress(currentWallet.kaspaAddress);
+            document.getElementById('activeWalletAddress').textContent = truncatedAddress;
+            document.getElementById('walletAddress').textContent = truncatedAddress;
+            
+            // Show funding info if wallet was just created
+            if (currentWallet.wasCreated) {
+                showFundingInfo(currentWallet.kaspaAddress);
+            }
+        }
+        
+        function changeWallet() {
+            // Reset state
+            currentWallet = null;
+            currentEpisodeId = null;
+            currentSessionToken = null;
+            isAuthenticated = false;
+            
+            // Show wallet panel again
+            document.getElementById('walletPanel').style.display = 'block';
+            document.getElementById('authPanel').style.display = 'none';
+            document.getElementById('commentForm').style.display = 'none';
+            
+            // Reset wallet sections
+            document.getElementById('createWalletSection').style.display = 'none';
+            document.getElementById('importWalletSection').style.display = 'none';
+            
+            // Reset forms
+            document.getElementById('generatedPrivateKey').value = '';
+            document.getElementById('importPrivateKey').value = '';
+            document.getElementById('saveToFileCheck').checked = false;
+            document.getElementById('saveImportedToFileCheck').checked = false;
+            
+            // Reset buttons
+            const generateButton = document.getElementById('generateButton');
+            generateButton.textContent = '[ GENERATE NEW WALLET ]';
+            generateButton.style.background = 'transparent';
+            generateButton.style.borderColor = 'var(--primary-teal)';
+            generateButton.disabled = false;
+            
+            const importButton = document.getElementById('importButton');
+            importButton.textContent = '[ VALIDATE & IMPORT WALLET ]';
+            importButton.style.background = 'transparent';
+            importButton.style.borderColor = 'var(--primary-teal)';
+            importButton.disabled = false;
+            
+            document.getElementById('copyKeyButton').disabled = true;
+            document.getElementById('proceedNewButton').style.display = 'none';
+        }
+        
+        // Check for existing wallet and authenticated episodes on page load
+        async function checkExistingWallet() {
+            try {
+                const response = await resilientFetch('/wallet/status');
+                const data = await response.json();
+                
+                if (data.exists && !data.error) {
+                    // User has an existing wallet
+                    currentWallet = {
+                        privateKey: 'stored_in_file', // Placeholder
+                        kaspaAddress: data.kaspa_address,
+                        publicKey: 'from_file', // Will be fetched when needed
+                        wasCreated: data.was_created,
+                        needsFunding: data.needs_funding
+                    };
+                    
+                    showAuthPanel();
+                } else {
+                    // No existing wallet, show wallet setup
+                    document.getElementById('walletPanel').style.display = 'block';
+                    document.getElementById('authPanel').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Failed to check existing wallet:', error);
+                // Show wallet setup on error
+                document.getElementById('walletPanel').style.display = 'block';
+                document.getElementById('authPanel').style.display = 'none';
+            }
+        }
+        
+        // Real API functions
+        async function connectWallet() {
+            if (!currentWallet) {
+                alert('No wallet available. Please create or import a wallet first.');
+                return;
+            }
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = '[ CONNECTING TO KASPA... ]';
+            button.disabled = true;
+            
+            // Hide logout button at start of authentication flow
+            const logoutBtn = document.getElementById('logoutButton');
+            if (logoutBtn) {
+                logoutBtn.style.display = 'none';
+                console.log('🔍 DEBUG: Logout button hidden at auth start');
+            }
+            
+            try {
+                // Step 1: Get wallet public key if needed
+                let walletData;
+                if (currentWallet.publicKey === 'from_file' || !currentWallet.publicKey) {
+                    const walletResponse = await resilientFetch('/wallet-participant');
+                    walletData = await walletResponse.json();
+                    
+                    if (walletData.error) {
+                        throw new Error(walletData.error);
+                    }
+                    
+                    currentWallet.publicKey = walletData.public_key;
+                    
+                    if (walletData.was_created || walletData.needs_funding) {
+                        button.textContent = '[ WALLET NEEDS FUNDING ]';
+                        showFundingInfo(currentWallet.kaspaAddress);
+                        button.disabled = false;
+                        return;
+                    }
+                } else {
+                    walletData = {
+                        public_key: currentWallet.publicKey,
+                        kaspa_address: currentWallet.kaspaAddress
+                    };
+                }
+                
+                // Step 2: Start authentication episode
+                const authResponse = await resilientFetch('/auth/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        public_key: walletData.public_key
+                    })
+                });
+                
+                const authData = await authResponse.json();
+                
+                if (authData.status === 'submitted_to_blockchain') {
+                    currentEpisodeId = authData.episode_id;
+                    
+                    // Update UI
+                    document.getElementById('episodeId').textContent = currentEpisodeId;
+                    document.getElementById('authEpisodeDisplay').textContent = currentEpisodeId;
+                    
+                    button.textContent = '[ WAITING FOR CHALLENGE... ]';
+                    
+                    // Hide logout button during challenge wait
+                    const logoutBtn = document.getElementById('logoutButton');
+                    if (logoutBtn) {
+                        logoutBtn.style.display = 'none';
+                        console.log('🔍 DEBUG: Logout button hidden during challenge wait');
+                    }
+                    
+                    // Connect WebSocket for real-time updates
+                    connectWebSocket();
+                    
+                    // Wait for challenge via WebSocket
+                    typewriterEffect(`CONNECTED TO KASPA NETWORK. AUTHENTICATING...`, button.parentElement);
+                } else {
+                    throw new Error('Login failed: ' + authData.status);
+                }
+                
+            } catch (error) {
+                console.error('Authentication failed:', error);
+                
+                if (error.message.includes('WALLET_NEEDS_FUNDING')) {
+                    button.textContent = '[ WALLET NEEDS FUNDING ]';
+                    button.style.background = 'var(--warning)';
+                    button.style.borderColor = 'var(--warning)';
+                    typewriterEffect(`WALLET NEEDS FUNDING! Visit https://faucet.kaspanet.io/ and fund: ${currentWallet.kaspaAddress}`, button.parentElement);
+                } else {
+                    button.textContent = '[ ERROR - TRY AGAIN ]';
+                    typewriterEffect(`ERROR: ${error.message}`, button.parentElement);
+                }
+                
+                button.disabled = false;
+            }
+        }
+        
+        // WebSocket connection for real-time updates
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+            
+            webSocket = new WebSocket(wsUrl);
+            
+            webSocket.onopen = () => {
+                console.log('✅ WebSocket connected');
+            };
+            
+            webSocket.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    handleWebSocketMessage(message);
+                } catch (error) {
+                    console.error('WebSocket message parsing error:', error);
+                }
+            };
+            
+            webSocket.onclose = () => {
+                console.log('❌ WebSocket disconnected');
+                // Attempt to reconnect after 3 seconds
+                setTimeout(connectWebSocket, 3000);
+            };
+            
+            webSocket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        }
+        
+        // Handle real-time WebSocket messages
+        function handleWebSocketMessage(message) {
+            console.log('📨 WebSocket message:', message);
+            
+            switch (message.type) {
+                case 'episode_created':
+                    // Only ignore if we've already processed this specific episode AND we're not starting fresh
+                    if (currentEpisodeId === message.episode_id && isProcessingChallenge) {
+                        console.log('🔄 Duplicate episode_created message ignored - already processing');
+                        return;
+                    }
+                    console.log('🎯 Episode created, requesting challenge...');
+                    currentEpisodeId = message.episode_id; // Ensure episode ID is set
+                    // Only request challenge if we're not already authenticated
+                    if (!isAuthenticated) {
+                        requestChallengeAfterEpisodeCreation();
+                    }
+                    break;
+                    
+                case 'challenge_issued':
+                    if (message.episode_id === currentEpisodeId && !isAuthenticated) {
+                        // Prevent duplicate challenge handling
+                        const button = document.getElementById('authButton');
+                        if (button.textContent.includes('SIGNING CHALLENGE')) {
+                            console.log('🔄 Duplicate challenge_issued message ignored - already processing');
+                            return;
+                        }
+                        handleChallenge(message.challenge);
+                    }
+                    break;
+                    
+                case 'authentication_successful':
+                    if (message.episode_id === currentEpisodeId && !isAuthenticated) {
+                        handleAuthenticated(message.session_token);
+                    }
+                    break;
+                    
+                case 'authentication_failed':
+                    if (message.episode_id === currentEpisodeId) {
+                        handleAuthenticationFailed(message.error);
+                    }
+                    break;
+                    
+                case 'session_revoked':
+                    // Session revoked for current episode - always handle it
+                    if (message.episode_id === currentEpisodeId) {
+                        console.log('🔍 DEBUG: Session revoked for current episode');
+                        handleSessionRevoked();
+                    }
+                    break;
+            }
+        }
+        
+        // Automatically request challenge after episode creation
+        async function requestChallengeAfterEpisodeCreation() {
+            // Prevent duplicate challenge requests
+            if (isProcessingChallenge) {
+                console.log('🔄 Challenge request already in progress - ignoring duplicate');
+                return;
+            }
+            
+            isProcessingChallenge = true;
+            console.log('🎯 Episode created, requesting challenge...');
+            
+            const button = document.getElementById('authButton');
+            button.textContent = '[ REQUESTING CHALLENGE... ]';
+            button.disabled = true; // Prevent multiple clicks
+            
+            try {
+                const response = await resilientFetch('/auth/request-challenge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        episode_id: currentEpisodeId,
+                        public_key: currentWallet.publicKey
+                    })
+                });
+                
+                const challengeData = await response.json();
+                
+                if (challengeData.nonce) {
+                    console.log('✅ Challenge request submitted:', challengeData.nonce);
+                    button.textContent = '[ WAITING FOR BLOCKCHAIN... ]';
+                    // The challenge will be handled via WebSocket message (challenge_issued)
+                } else {
+                    throw new Error('No challenge received from endpoint');
+                }
+                
+            } catch (error) {
+                console.error('❌ Challenge request failed:', error);
+                button.textContent = '[ CHALLENGE REQUEST FAILED ]';
+                button.disabled = false; // Re-enable on error
+                isProcessingChallenge = false; // Reset state lock
+                typewriterEffect(`CHALLENGE ERROR: ${error.message}`, button.parentElement);
+            }
+        }
+        
+        // Handle challenge received via WebSocket
+        async function handleChallenge(challenge) {
+            console.log('🎲 Challenge received:', challenge);
+            const button = document.getElementById('authButton');
+            button.textContent = '[ SIGNING CHALLENGE... ]';
+            button.disabled = true; // Prevent multiple submissions
+            
+            try {
+                // Use the actual challenge as the nonce (not a timestamp!)
+                const nonce = challenge;
+                
+                // Get real signature from server-side signing endpoint
+                const signResponse = await resilientFetch('/auth/sign-challenge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        challenge: challenge,
+                        private_key: "use_participant_wallet"
+                    })
+                });
+                
+                const signData = await signResponse.json();
+                if (signData.error) {
+                    throw new Error('Signing failed: ' + signData.error);
+                }
+                
+                const signature = signData.signature;
+                    
+                    // Submit response
+                    const verifyResponse = await resilientFetch('/auth/verify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            episode_id: currentEpisodeId,
+                            signature: signature,
+                            nonce: nonce
+                        })
+                    });
+                    
+                    const verifyData = await verifyResponse.json();
+                    
+                    if (verifyData.status === 'submit_response_submitted') {
+                        button.textContent = '[ WAITING FOR AUTHENTICATION... ]';
+                        typewriterEffect('CHALLENGE SIGNED. WAITING FOR BLOCKCHAIN CONFIRMATION...', button.parentElement);
+                    } else if (verifyData.status === 'already_authenticated') {
+                        console.log('🔄 Authentication already completed - no duplicate transaction needed');
+                        handleAuthenticated(currentSessionToken || 'existing_session');
+                    } else if (verifyData.status === 'request_in_progress') {
+                        console.log('🔄 Duplicate request blocked - authentication already in progress');
+                        button.textContent = '[ AUTHENTICATION IN PROGRESS... ]';
+                        button.disabled = false; // Re-enable button for user retry
+                        // Don't throw error, just wait for WebSocket update
+                    } else {
+                        throw new Error('Failed to submit response: ' + verifyData.status);
+                    }
+            } catch (error) {
+                console.error('Challenge handling failed:', error);
+                button.textContent = '[ ERROR - TRY AGAIN ]';
+                button.disabled = false;
+                isProcessingChallenge = false; // Reset state lock on error
+            }
+        }
+        
+        // Handle successful authentication
+        function handleAuthenticated(sessionToken) {
+            console.log('✅ Authentication successful! Session token:', sessionToken);
+            console.log('🔍 DEBUG: handleAuthenticated called - about to show logout button');
+            
+            currentSessionToken = sessionToken;
+            isAuthenticated = true;
+            isProcessingChallenge = false; // Reset state lock on success
+            
+            const button = document.getElementById('authButton');
+            button.textContent = '[ EPISODE AUTHENTICATED ]';
+            button.style.background = 'var(--success)';
+            button.style.borderColor = 'var(--success)';
+            button.style.color = 'var(--bg-black)';
+            button.disabled = true; // Disable button to prevent multiple authentication attempts
+            
+            // Show logout button
+            const logoutBtn = document.getElementById('logoutButton');
+            if (logoutBtn) {
+                logoutBtn.style.display = 'block';
+                console.log('🔍 DEBUG: Logout button shown after authentication success');
+            }
+            
+            // Show comment form with authenticated features
+            showCommentForm(true);
+            
+            typewriterEffect(`LOGIN SUCCESSFUL! WELCOME TO KASPA NETWORK.`, button.parentElement);
+        }
+        
+        // Logout function - revokes session on blockchain
+        async function logout() {
+            if (!currentSessionToken || !currentEpisodeId) {
+                console.log('No active session to logout');
+                return;
+            }
+            
+            const button = document.getElementById('logoutButton');
+            const originalText = button.textContent;
+            button.textContent = '[ REVOKING SESSION... ]';
+            button.disabled = true;
+            
+            try {
+                // Generate signature for session token (proof of ownership)
+                const signResponse = await resilientFetch('/auth/sign-challenge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        challenge: currentSessionToken, // Sign the session token itself
+                        private_key: "use_participant_wallet"
+                    })
+                });
+                
+                const signData = await signResponse.json();
+                if (signData.error) {
+                    throw new Error('Failed to sign session token: ' + signData.error);
+                }
+                
+                const response = await resilientFetch('/auth/revoke-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        episode_id: currentEpisodeId,
+                        session_token: currentSessionToken,
+                        signature: signData.signature
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'session_revocation_submitted') {
+                    button.textContent = '[ WAITING FOR BLOCKCHAIN... ]';
+                    typewriterEffect('Session revocation submitted to blockchain...', button.parentElement);
+                    // WebSocket will handle the actual logout when blockchain confirms
+                } else {
+                    throw new Error('Failed to revoke session: ' + data.status);
+                }
+            } catch (error) {
+                console.error('Logout failed:', error);
+                button.textContent = originalText;
+                button.disabled = false;
+                typewriterEffect(`LOGOUT ERROR: ${error.message}`, button.parentElement);
+            }
+        }
+        
+        // Handle authentication failure
+        function handleAuthenticationFailed(error) {
+            console.error('❌ Authentication failed:', error);
+            
+            const button = document.getElementById('authButton');
+            button.textContent = '[ AUTHENTICATION FAILED ]';
+            button.style.background = 'var(--error)';
+            button.style.borderColor = 'var(--error)';
+            button.disabled = false;
+            
+            typewriterEffect(`AUTHENTICATION FAILED: ${error}`, button.parentElement);
+        }
+        
+        // Handle session revocation
+        function handleSessionRevoked() {
+            console.log('🚪 Session revoked');
+            
+            isAuthenticated = false;
+            currentSessionToken = null;
+            isProcessingChallenge = false; // Reset state lock
+            
+            // Hide comment form and logout button
+            document.getElementById('commentForm').style.display = 'none';
+            document.getElementById('logoutButton').style.display = 'none';
+            
+            // Reset connect button
+            const button = document.getElementById('authButton');
+            button.textContent = '[ CREATE AUTH EPISODE ]';
+            button.style.background = 'transparent';
+            button.style.borderColor = 'var(--primary-teal)';
+            button.style.color = 'var(--bright-teal)';
+            button.disabled = false;
+            
+            typewriterEffect('SESSION REVOKED. RELOADING PAGE FOR FRESH START...', button.parentElement);
+            
+            // Force browser restart after logout to clear all state
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        }
+        
+        // Show comment form with different features for authenticated vs anonymous
+        function showCommentForm(authenticated) {
+            const commentForm = document.getElementById('commentForm');
+            const commentInput = document.getElementById('commentInput');
+            const charCount = document.getElementById('charCount');
+            
+            if (authenticated) {
+                // Authenticated user features
+                commentInput.maxLength = 2000;
+                commentInput.placeholder = "Enter your authenticated episode message... (2000 chars max, edit window: 5 mins, replies enabled)";
+                charCount.textContent = '2000';
+                
+                // Update character counter logic for authenticated users
+                commentInput.oninput = () => {
+                    const remaining = 2000 - commentInput.value.length;
+                    charCount.textContent = remaining;
+                    charCount.style.color = remaining < 200 ? 'var(--warning)' : 'var(--primary-teal)';
+                };
+            } else {
+                // Anonymous user features
+                commentInput.maxLength = 1000;
+                commentInput.placeholder = "Enter your anonymous episode message... (1000 chars max, no edits, no replies)";
+                charCount.textContent = '1000';
+                
+                // Update character counter logic for anonymous users
+                commentInput.oninput = () => {
+                    const remaining = 1000 - commentInput.value.length;
+                    charCount.textContent = remaining;
+                    charCount.style.color = remaining < 100 ? 'var(--warning)' : 'var(--primary-teal)';
+                };
+            }
+            
+            commentForm.style.display = 'block';
+        }
+        
+        // Handle anonymous mode
+        function handleAnonymousMode() {
+            const isAnonymous = document.getElementById('anonMode').checked;
+            
+            if (isAnonymous) {
+                // Generate temporary anonymous identity
+                const anonId = 'ANON_' + Math.random().toString(36).substr(2, 8).toUpperCase();
+                document.getElementById('walletAddress').textContent = anonId;
+                document.getElementById('episodeId').textContent = 'TEMP_' + Math.floor(Math.random() * 10000);
+                
+                // Show comment form with anonymous features
+                showCommentForm(false);
+                
+                // Hide authentication panel
+                document.querySelector('#authPanel').style.display = 'none';
+            } else {
+                // Show authentication panel only if not already authenticated
+                if (!isAuthenticated) {
+                    document.querySelector('#authPanel').style.display = 'block';
+                    document.getElementById('commentForm').style.display = 'none';
+                    
+                    // Reset participant info
+                    if (currentWallet) {
+                        document.getElementById('walletAddress').textContent = truncateKaspaAddress(currentWallet.kaspaAddress);
+                    } else {
+                        document.getElementById('walletAddress').textContent = 'kaspa:qrxx...v8wz';
+                    }
+                    document.getElementById('episodeId').textContent = currentEpisodeId || '--';
+                }
+            }
+        }
+        
+        // Show funding information for new wallets
+        function showFundingInfo(kaspaAddress) {
+            const fundingDiv = document.createElement('div');
+            fundingDiv.style.marginTop = '20px';
+            fundingDiv.style.padding = '15px';
+            fundingDiv.style.background = 'var(--warning)';
+            fundingDiv.style.color = 'var(--bg-black)';
+            fundingDiv.style.borderRadius = '4px';
+            fundingDiv.innerHTML = `
+                <strong>NEW WALLET CREATED - FUNDING REQUIRED</strong><br>
+                <small>Address: ${kaspaAddress}</small><br>
+                <small>Get testnet funds: <a href="https://faucet.kaspanet.io/" target="_blank" style="color: var(--bg-black);">https://faucet.kaspanet.io/</a></small><br>
+                <small>Refresh page after funding to continue authentication.</small>
+            `;
+            
+            document.querySelector('.auth-panel').appendChild(fundingDiv);
+        }
+        
+        function submitComment() {
+            if (!isAuthenticated) {
+                alert('Please authenticate first!');
+                return;
+            }
+            
+            const button = event.target;
+            const originalText = button.textContent;
+            button.disabled = true;
+            
+            // For now, this is a placeholder for the commenting system
+            const messages = [
+                '[ CREATING COMMENT EPISODE... ]',
+                '[ SIGNING WITH AUTH SESSION... ]',
+                '[ SUBMITTING TO KDAPP ENGINE... ]',
+                '[ BROADCASTING TO KASPA NODES... ]',
+                '[ AWAITING DAA CONFIRMATION... ]',
+                '[ EPISODE CONFIRMED ON CHAIN ]'
+            ];
+            
+            let index = 0;
+            const interval = setInterval(() => {
+                if (index < messages.length) {
+                    button.textContent = messages[index];
+                    index++;
+                } else {
+                    clearInterval(interval);
+                    button.textContent = originalText;
+                    button.disabled = false;
+                    
+                    // Add new comment (mock for now)
+                    addNewComment();
+                    
+                    // Clear input
+                    commentInput.value = '';
+                    charCount.textContent = '1000';
+                }
+            }, 800);
+        }
+        
+        function addNewComment() {
+            const container = document.getElementById('commentsContainer');
+            const comment = document.createElement('div');
+            
+            const isAnonymous = !isAuthenticated && document.getElementById('anonMode').checked;
+            
+            if (isAnonymous) {
+                // Anonymous comment styling
+                comment.className = 'comment-card comment-anonymous';
+                comment.style.borderLeft = '4px solid rgba(255, 255, 255, 0.3)';
+                comment.style.opacity = '0.8';
+                
+                const anonId = document.getElementById('walletAddress').textContent;
+                const tempEpisodeId = document.getElementById('episodeId').textContent;
+                const blockHeight = parseInt(document.getElementById('blockHeight').textContent.replace(/,/g, ''));
+                
+                comment.innerHTML = `
+                    <div class="comment-header">
+                        <span class="comment-author" style="color: rgba(255,255,255,0.6);">${anonId}</span>
+                        <div class="comment-meta">
+                            <span>TEMP: ${tempEpisodeId}</span>
+                            <span>ANON MODE</span>
+                        </div>
+                    </div>
+                    <div class="comment-body">
+                        ${commentInput.value}
+                    </div>
+                    <div style="font-size: 0.7rem; color: rgba(255,255,255,0.5); margin-top: 10px;">
+                        [ ANONYMOUS COMMENT - NOT VERIFIED ON BLOCKCHAIN ]
+                    </div>
+                `;
+            } else {
+                // Authenticated comment styling
+                comment.className = 'comment-card comment-authenticated';
+                comment.style.borderLeft = '4px solid var(--bright-cyan)';
+                comment.style.background = 'rgba(20, 184, 166, 0.1)';
+                
+                const walletAddress = document.getElementById('walletAddress').textContent;
+                const episodeId = currentEpisodeId || Math.floor(Math.random() * 900000) + 100000;
+                const blockHeight = parseInt(document.getElementById('blockHeight').textContent.replace(/,/g, ''));
+                
+                comment.innerHTML = `
+                    <div class="comment-header">
+                        <span class="comment-author">${walletAddress}</span>
+                        <div class="comment-meta">
+                            <span>EPISODE: ${episodeId}</span>
+                            <span>BLOCK: ${blockHeight.toLocaleString()}</span>
+                            <span class="author-badge" style="background: linear-gradient(45deg, var(--primary-teal), var(--bright-cyan)); padding: 2px 8px; border-radius: 12px; font-size: 0.6rem; text-transform: uppercase;">VERIFIED</span>
+                        </div>
+                    </div>
+                    <div class="comment-body">
+                        ${commentInput.value}
+                    </div>
+                    <a href="#" class="verify-link">[ VERIFY ON KASPA EXPLORER → ]</a>
+                `;
+            }
+            
+            container.insertBefore(comment, container.firstChild);
+            
+            // Update stats
+            const commentCount = parseInt(document.getElementById('commentEpisodes').textContent.replace(/,/g, ''));
+            document.getElementById('commentEpisodes').textContent = (commentCount + 1).toLocaleString();
+        }
+        
+        function typewriterEffect(text, container) {
+            const div = document.createElement('div');
+            div.style.color = 'var(--success)';
+            div.style.marginTop = '15px';
+            div.style.fontSize = '0.9rem';
+            container.appendChild(div);
+            
+            let index = 0;
+            const interval = setInterval(() => {
+                if (index < text.length) {
+                    div.textContent += text[index];
+                    index++;
+                } else {
+                    clearInterval(interval);
+                    setTimeout(() => div.remove(), 3000);
+                }
+            }, 50);
+        }
+        
+        // Konami code easter egg
+        let konamiCode = [];
+        const konamiPattern = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+        
+        document.addEventListener('keydown', (e) => {
+            konamiCode.push(e.key);
+            konamiCode = konamiCode.slice(-10);
+            
+            if (konamiCode.join(',') === konamiPattern.join(',')) {
+                document.body.style.animation = 'glow-pulse 0.5s infinite';
+                alert('EPISODE HACK MODE ACTIVATED!');
+            }
+        });
+        
+        // Removed - now in main DOMContentLoaded above
+    </script>
+</body>
+</html>

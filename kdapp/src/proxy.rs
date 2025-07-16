@@ -71,7 +71,13 @@ pub async fn connect_client(network_id: NetworkId, rpc_url: Option<String>) -> R
 pub type EngineMap = HashMap<PrefixType, (PatternType, Sender<Msg>)>;
 
 pub async fn run_listener(kaspad: KaspaRpcClient, engines: EngineMap, exit_signal: Arc<AtomicBool>) {
-    let info = kaspad.get_block_dag_info().await.unwrap();
+    let info = match kaspad.get_block_dag_info().await {
+        Ok(info) => info,
+        Err(e) => {
+            warn!("Failed to get block DAG info: {}. Retrying...", e);
+            return;
+        }
+    };
     let mut sink = info.sink;
     let mut now = Instant::now();
     info!("Sink: {}", sink);
@@ -83,7 +89,13 @@ pub async fn run_listener(kaspad: KaspaRpcClient, engines: EngineMap, exit_signa
         sleep_until(now + Duration::from_secs(1)).await;
         now = Instant::now();
 
-        let vcb = kaspad.get_virtual_chain_from_block(sink, true).await.unwrap();
+        let vcb = match kaspad.get_virtual_chain_from_block(sink, true).await {
+            Ok(vcb) => vcb,
+            Err(e) => {
+                warn!("Failed to get virtual chain from block: {}. Retrying...", e);
+                continue;
+            }
+        };
 
         debug!("vspc: {}, {}", vcb.removed_chain_block_hashes.len(), vcb.accepted_transaction_ids.len());
 
@@ -97,7 +109,9 @@ pub async fn run_listener(kaspad: KaspaRpcClient, engines: EngineMap, exit_signa
         for rcb in vcb.removed_chain_block_hashes {
             for (_, sender) in engines.values() {
                 let msg = Msg::BlkReverted { accepting_hash: rcb };
-                sender.send(msg).unwrap();
+                if let Err(e) = sender.send(msg) {
+                    warn!("Failed to send block reverted message to engine: {}", e);
+                }
             }
         }
 
@@ -122,8 +136,20 @@ pub async fn run_listener(kaspad: KaspaRpcClient, engines: EngineMap, exit_signa
                 continue;
             }
 
-            let accepting_block = kaspad.get_block(accepting_hash, false).await.unwrap(); // no need for txs of this block itself
-            let verbose = accepting_block.verbose_data.unwrap();
+            let accepting_block = match kaspad.get_block(accepting_hash, false).await {
+                Ok(block) => block,
+                Err(e) => {
+                    warn!("Failed to get accepting block {}: {}. Skipping...", accepting_hash, e);
+                    continue;
+                }
+            };
+            let verbose = match accepting_block.verbose_data {
+                Some(verbose) => verbose,
+                None => {
+                    warn!("Accepting block {} has no verbose data. Skipping...", accepting_hash);
+                    continue;
+                }
+            };
             assert_eq!(verbose.selected_parent_hash, verbose.merge_set_blues_hashes[0]);
             debug!(
                 "accepting block: {}, selected parent: {}, mergeset len: {}",
@@ -134,14 +160,22 @@ pub async fn run_listener(kaspad: KaspaRpcClient, engines: EngineMap, exit_signa
 
             // Iterate over merged blocks until finding all accepted and required txs (the mergeset is guaranteed to contain these txs)
             'outer: for merged_hash in verbose.merge_set_blues_hashes.into_iter().chain(verbose.merge_set_reds_hashes) {
-                let merged_block = kaspad.get_block(merged_hash, true).await.unwrap();
+                let merged_block = match kaspad.get_block(merged_hash, true).await {
+                    Ok(block) => block,
+                    Err(e) => {
+                        warn!("Failed to get merged block {}: {}. Skipping...", merged_hash, e);
+                        continue;
+                    }
+                };
                 for tx in merged_block.transactions.into_iter().skip(1) {
-                    if let Some(required_payload) = required_payloads.get_mut(&tx.verbose_data.unwrap().transaction_id) {
-                        if required_payload.is_none() {
-                            required_payload.replace(tx.payload);
-                            required_num -= 1;
-                            if required_num == 0 {
-                                break 'outer;
+                    if let Some(tx_verbose) = tx.verbose_data {
+                        if let Some(required_payload) = required_payloads.get_mut(&tx_verbose.transaction_id) {
+                            if required_payload.is_none() {
+                                required_payload.replace(tx.payload);
+                                required_num -= 1;
+                                if required_num == 0 {
+                                    break 'outer;
+                                }
                             }
                         }
                     }
@@ -164,10 +198,13 @@ pub async fn run_listener(kaspad: KaspaRpcClient, engines: EngineMap, exit_signa
                         match required_payloads.entry(id) {
                             Entry::Occupied(entry) => {
                                 // The prefix is unique per engine, so once we find a match we can consume the entry
-                                if Payload::check_header(entry.get().as_ref().unwrap(), prefix) {
-                                    let payload = entry.remove().unwrap();
-                                    consumed_txs += 1;
-                                    return Some((id, Payload::strip_header(payload)));
+                                if let Some(payload_ref) = entry.get().as_ref() {
+                                    if Payload::check_header(payload_ref, prefix) {
+                                        if let Some(payload) = entry.remove() {
+                                            consumed_txs += 1;
+                                            return Some((id, Payload::strip_header(payload)));
+                                        }
+                                    }
                                 }
                             }
                             Entry::Vacant(_) => {}
@@ -185,7 +222,9 @@ pub async fn run_listener(kaspad: KaspaRpcClient, engines: EngineMap, exit_signa
                         accepting_time: accepting_block.header.timestamp,
                         associated_txs,
                     };
-                    sender.send(msg).unwrap();
+                    if let Err(e) = sender.send(msg) {
+                        warn!("Failed to send block accepted message to engine: {}", e);
+                    }
                 }
                 if consumed_txs == required_txs.len() {
                     // No need to check additional engines
@@ -196,6 +235,8 @@ pub async fn run_listener(kaspad: KaspaRpcClient, engines: EngineMap, exit_signa
     }
 
     for (_, sender) in engines.values() {
-        sender.send(Msg::Exit).unwrap();
+        if let Err(e) = sender.send(Msg::Exit) {
+            warn!("Failed to send exit message to engine: {}", e);
+        }
     }
 }
